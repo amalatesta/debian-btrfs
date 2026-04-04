@@ -27,19 +27,91 @@ El propósito es contar con una guía clara y reproducible que permita:
 
 ## 📋 Tabla de Contenidos
 
-1. Preparación
-2. Instalación Base Debian
-3. Configuración de Subvolúmenes BTRFS
-4. Configurar acceso SSH (Opcional pero recomendado)
-5. VirtualBox Guest Additions
-6. Configuración de Snapper
-7. Configuración de btrbk
-8. grub-btrfs
-9. Entrada de Emergencia en GRUB
-10. Procedimientos de Recuperación
-11. Instalación en Notebook Física
-12. Verificación y Mantenimiento
-13. Próximos Pasos
+1. [Preparación](#1-preparación)
+   - [1.1 Descargas necesarias](#11-descargas-necesarias)
+   - [1.2 Configuración VM VirtualBox](#12-configuración-vm-virtualbox)
+   - [1.3 Configuración adicional (antes de arrancar)](#13-configuración-adicional-antes-de-arrancar)
+2. [Instalación Base Debian](#2-instalación-base-debian)
+   - [2.1 Arrancar instalador](#21-arrancar-instalador)
+   - [2.2 Configuración inicial](#22-configuración-inicial)
+   - [2.3 Configuración de usuarios](#23-configuración-de-usuarios)
+   - [2.4 Configuración de reloj](#24-configuración-de-reloj)
+   - [2.5 Particionado de discos CRÍTICO](#25-particionado-de-discos-crítico)
+   - [2.6 Instalación del sistema base](#26-instalación-del-sistema-base)
+   - [2.7 Instalación de GRUB](#27-instalación-de-grub)
+   - [2.8 Finalizar instalación](#28-finalizar-instalación)
+3. [Configuración de Subvolúmenes BTRFS](#3-configuración-de-subvolúmenes-btrfs)
+   - [3.1 Limpiar /etc/fstab](#31-limpiar-etcfstab-prevenir-demoras-en-arranque)
+   - [3.2 Apagar sistema y arrancar Rescue Mode](#32-apagar-sistema-y-arrancar-rescue-mode)
+   - [3.3 Arrancar en Rescue Mode](#33-arrancar-en-rescue-mode)
+   - [3.4 Renombrar a estructura estándar y crear @home](#34-renombrar-a-estructura-estándar-y-crear-home)
+   - [3.5 Verificación crítica del renombrado](#s3-verificacion-renombrado)
+   - [3.6 Actualizar /etc/fstab](#36-actualizar-etcfstab)
+   - [3.7 Reinstalar GRUB después de cambios](#s3-reinstalar-grub)
+   - [3.8 Al reiniciar debe ocurrir](#s3-al-reiniciar)
+   - [3.9 Si el sistema no arranca](#s3-si-no-arranca)
+   - [3.10 Verificar configuración](#310-verificar-configuración)
+   - [3.11 Quitar ISO y arrancar sistema](#311-quitar-iso-y-arrancar-sistema)
+   - [3.12 Verificar arranque con subvolúmenes](#312-verificar-arranque-con-subvolúmenes)
+4. [Configurar acceso SSH (Opcional pero recomendado)](#4-configurar-acceso-ssh-opcional-pero-recomendado)
+   - [4.1 Instalar y configurar SSH en Debian](#41-instalar-y-configurar-ssh-en-debian)
+   - [4.2 Configuración para VirtualBox (Port Forwarding)](#42-configuración-para-virtualbox-port-forwarding)
+   - [4.3 Conectarse por SSH desde Windows](#43-conectarse-por-ssh-desde-windows)
+   - [4.4 Conectarse desde Linux/Mac](#44-conectarse-desde-linuxmac)
+   - [4.5 Configuración alternativa: Modo Bridge (IP directa)](#45-configuración-alternativa-modo-bridge-ip-directa)
+   - [4.6 Configuración de seguridad básica (Opcional)](#46-configuración-de-seguridad-básica-opcional)
+   - [4.7 Transferir archivos por SCP/SFTP](#47-transferir-archivos-por-scpsftp)
+   - [4.8 Troubleshooting SSH](#48-troubleshooting-ssh)
+5. [VirtualBox Guest Additions](#5-virtualbox-guest-additions)
+   - [5.1 Instalar dependencias](#51-instalar-dependencias)
+   - [5.2 Insertar ISO de Guest Additions](#52-insertar-iso-de-guest-additions)
+   - [5.3 Montar y ejecutar instalador](#53-montar-y-ejecutar-instalador)
+   - [5.4 Verificar instalación](#54-verificar-instalación)
+   - [5.5 Habilitar funciones](#55-habilitar-funciones)
+6. [Configuración de Snapper](#6-configuración-de-snapper)
+   - [6.1 Instalar paquetes](#61-instalar-paquetes)
+   - [6.2 Crear configuración de Snapper](#62-crear-configuración-de-snapper)
+   - [6.3 Configurar retención](#63-configurar-retención-solo-eventos-no-tiempo)
+   - [6.4 Configurar snapshots PRE/POST para APT](#64-configurar-snapshots-prepost-para-apt)
+   - [6.5 Habilitar servicios de Snapper](#65-habilitar-servicios-de-snapper)
+   - [6.6 Probar funcionamiento](#66-probar-funcionamiento)
+7. [Configuración de btrbk](#7-configuración-de-btrbk)
+   - [7.1 Instalar btrbk](#71-instalar-btrbk)
+   - [7.2 Preparar montajes](#72-preparar-montajes)
+   - [7.3 Crear configuración de btrbk](#73-crear-configuración-de-btrbk)
+   - [7.4 Preparar partición de recuperación](#74-preparar-partición-de-recuperación)
+   - [7.5 Probar btrbk](#75-probar-btrbk)
+   - [7.6 Configurar protección de partición de recuperación](#76-configurar-protección-de-partición-de-recuperación)
+   - [7.7 Desmontar partición de recuperación](#77-desmontar-partición-de-recuperación)
+   - [7.8 Automatizar btrbk](#78-automatizar-btrbk)
+8. [grub-btrfs](#8-grub-btrfs)
+   - [8.1 Instalación manual desde GitHub](#81-instalación-manual-desde-github)
+   - [8.2 Configurar grub-btrfs](#82-configurar-grub-btrfs-simplificado-con-)
+   - [8.3 Habilitar servicio](#83-habilitar-servicio)
+   - [8.4 Actualizar GRUB](#84-actualizar-grub)
+   - [8.5 Verificar en próximo reinicio](#85-verificar-en-próximo-reinicio)
+9. [Entrada de Emergencia en GRUB](#9-entrada-de-emergencia-en-grub)
+   - [9.1 Obtener información necesaria](#91-obtener-información-necesaria)
+   - [9.2 Crear entrada custom en GRUB](#92-crear-entrada-custom-en-grub)
+   - [9.3 Actualizar GRUB](#93-actualizar-grub)
+   - [9.4 Probar entrada (opcional)](#94-probar-entrada-opcional)
+10. [Procedimientos de Recuperación](#10-procedimientos-de-recuperación)
+   - [10.1 Crear documento de procedimientos](#101-crear-documento-de-procedimientos)
+   - [10.2 Crear Live USB de recuperación](#102-crear-live-usb-de-recuperación)
+11. [Instalación en Notebook Física](#11-instalación-en-notebook-física)
+   - [11.1 Diferencias VM vs Notebook](#111-diferencias-vm-vs-notebook)
+   - [11.2 Preparación notebook](#112-preparación-notebook)
+   - [11.3 Ajustes específicos para notebook](#113-ajustes-específicos-para-notebook)
+   - [11.4 Checklist de instalación en notebook](#114-checklist-de-instalación-en-notebook)
+12. [Verificación y Mantenimiento](#12-verificación-y-mantenimiento)
+   - [12.1 Comandos de verificación diaria](#121-comandos-de-verificación-diaria)
+   - [12.2 Mantenimiento semanal](#122-mantenimiento-semanal)
+   - [12.3 Mantenimiento mensual](#123-mantenimiento-mensual)
+   - [12.4 Script de verificación automática](#124-script-de-verificación-automática)
+13. [Próximos Pasos](#13-próximos-pasos)
+   - [13.1 Crear snapshot "Sistema base listo"](#131-crear-snapshot-sistema-base-listo)
+   - [13.2 Instalar entorno de escritorio](#132-instalar-entorno-de-escritorio)
+   - [13.3 Personalización (Windows 11 style)](#133-personalización-windows-11-style)
 
 ---
 
@@ -361,7 +433,7 @@ sudo reboot
 
 ---
 
-### 3.1 Apagar sistema y arrancar Rescue Mode
+### 3.2 Apagar sistema y arrancar Rescue Mode
 
 ```bash
 # Desde el sistema instalado
@@ -437,7 +509,7 @@ Si GRUB ya está instalado:
 ---
 
 
-### 3.2 Arrancar en Rescue Mode
+### 3.3 Arrancar en Rescue Mode
 
 ```
 Menú GRUB del instalador:
@@ -458,7 +530,7 @@ Execute a shell:
 Presionar Enter en mensaje informativo
 ```
 
-### 3.3 Renombrar a estructura estándar y crear @home
+### 3.4 Renombrar a estructura estándar y crear @home
 
 **Comandos a ejecutar:**
 
@@ -516,7 +588,8 @@ ls /mnt/btrfs/@/home/
 ```
 
 
-### ✅ Verificación CRÍTICA del renombrado (OBLIGATORIO)
+<a id="s3-verificacion-renombrado"></a>
+### 3.5 ✅ Verificación CRÍTICA del renombrado (OBLIGATORIO)
 
 **Antes de continuar, verifica que el renombrado fue exitoso:**
 
@@ -558,7 +631,7 @@ ls -la  # Verificar que ahora muestre @
 ---
 
 
-### 3.4 Actualizar /etc/fstab
+### 3.6 Actualizar /etc/fstab
 
 **Obtener UUIDs:**
 
@@ -601,7 +674,8 @@ UUID=1234-5678-90ab-cdef  /mnt/btrfs-root  btrfs  subvolid=5,noauto,compress=zst
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
 
-### 3.6 ⚠️ CRÍTICO: Reinstalar GRUB después de cambios
+<a id="s3-reinstalar-grub"></a>
+### 3.7 ⚠️ CRÍTICO: Reinstalar GRUB después de cambios
 
 **IMPORTANTE:** Después de renombrar subvolúmenes y editar fstab, 
 DEBES reinstalar GRUB para que use la nueva configuración.
@@ -759,7 +833,8 @@ reboot
 
 ---
 
-### ✅ Al reiniciar debe ocurrir:
+<a id="s3-al-reiniciar"></a>
+### 3.8 ✅ Al reiniciar debe ocurrir:
 
 1. **Aparece el menú de GRUB** automáticamente
 2. **Selecciona "Debian GNU/Linux"**
@@ -768,7 +843,8 @@ reboot
 
 ---
 
-### ❌ Si el sistema NO arranca:
+<a id="s3-si-no-arranca"></a>
+### 3.9 ❌ Si el sistema NO arranca:
 
 **Síntoma 1:** Queda en shell de GRUB (`grub>`)
 → Ve a sección 9.3: Recuperación de GRUB
@@ -787,7 +863,7 @@ El que funcione es el nombre real.
 ---
 
 
-### 3.5 Verificar configuración
+### 3.10 Verificar configuración
 
 ```bash
 # Verificar sintaxis de fstab
@@ -809,7 +885,7 @@ exit
 # → Continue
 ```
 
-### 3.6 Quitar ISO y arrancar sistema
+### 3.11 Quitar ISO y arrancar sistema
 
 ```
 Cuando VM se apague/reinicie:
@@ -828,7 +904,7 @@ Settings → Storage → Controller: SATA
 OK → Iniciar VM
 ```
 
-### 3.7 Verificar arranque con subvolúmenes
+### 3.12 Verificar arranque con subvolúmenes
 
 ```bash
 # Login con tu usuario
@@ -1217,7 +1293,7 @@ ssh administrador@localhost -p 2222
 
 ⚠️ **Hacer ANTES de instalar Snapper/btrbk para tener copiar/pegar funcionando**
 
-### 4.1 Instalar dependencias
+### 5.1 Instalar dependencias
 
 ```bash
 # Actualizar sistema
@@ -1228,7 +1304,7 @@ sudo apt upgrade -y
 sudo apt install -y build-essential dkms linux-headers-$(uname -r)
 ```
 
-### 4.2 Insertar ISO de Guest Additions
+### 5.2 Insertar ISO de Guest Additions
 
 ```
 Menú VirtualBox (arriba):
@@ -1236,7 +1312,7 @@ Menú VirtualBox (arriba):
 → Insert Guest Additions CD image...
 ```
 
-### 4.3 Montar y ejecutar instalador
+### 5.3 Montar y ejecutar instalador
 
 ```bash
 # Crear punto de montaje
@@ -1265,7 +1341,7 @@ sudo umount /mnt/cdrom
 sudo reboot
 ```
 
-### 4.4 Verificar instalación
+### 5.4 Verificar instalación
 
 ```bash
 # Login después de reinicio
@@ -1282,7 +1358,7 @@ lsmod | grep vbox
 VBoxControl --version
 ```
 
-### 4.5 Habilitar funciones
+### 5.5 Habilitar funciones
 
 **En el menú de VirtualBox:**
 
@@ -1300,7 +1376,7 @@ Devices → Drag and Drop → Bidirectional
 
 ## 6. Configuración de Snapper
 
-### 5.1 Instalar paquetes
+### 6.1 Instalar paquetes
 
 ```bash
 # Instalar Snapper y herramientas BTRFS
@@ -1310,7 +1386,7 @@ sudo apt install -y btrfs-progs snapper inotify-tools
 sudo apt install -y vim curl wget net-tools
 ```
 
-### 5.2 Crear configuración de Snapper
+### 6.2 Crear configuración de Snapper
 
 ```bash
 # Crear configuración para raíz (solo sistema operativo, NO /home)
@@ -1324,14 +1400,14 @@ sudo snapper -c root list
 # 0 | single |       |      | root |         | current     |
 
 # Verificar que se creó directorio de snapshots
-ls -la /.snapshots/
+sudo ls -la /.snapshots/
 
 # Ver subvolumen creado
 sudo btrfs subvolume list /
 # Debe aparecer: .snapshots (ID 258 o similar)
 ```
 
-### 5.3 Configurar retención (SOLO eventos, NO tiempo)
+### 6.3 Configurar retención (SOLO eventos, NO tiempo)
 
 ```bash
 # Deshabilitar snapshots automáticos por tiempo
@@ -1350,7 +1426,7 @@ sudo snapper -c root get-config | grep -E "TIMELINE|NUMBER"
 # NUMBER_LIMIT_IMPORTANT  | 10
 ```
 
-### 5.4 Configurar snapshots PRE/POST para APT
+### 6.4 Configurar snapshots PRE/POST para APT
 
 **Crear hook de APT:**
 
@@ -1362,18 +1438,38 @@ sudo nano /etc/apt/apt.conf.d/80snapper
 
 ```
 // Snapper PRE/POST snapshots para APT
-DPkg::Pre-Invoke {
-  "if [ -x /usr/bin/snapper ]; then /usr/bin/snapper create --type=pre --cleanup-algorithm=number --print-number --description='apt-pre' > /tmp/snapper-pre-apt 2>&1; fi";
-};
+// Versión oficial de Debian (mejorada con mejor manejo de errores y limpieza automática)
+// Ref: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=770938
 
-DPkg::Post-Invoke {
-  "if [ -x /usr/bin/snapper ]; then /usr/bin/snapper create --type=post --cleanup-algorithm=number --pre-number=$(cat /tmp/snapper-pre-apt 2>/dev/null | tail -1) --description='apt-post' 2>&1; rm -f /tmp/snapper-pre-apt; fi";
-};
+DPkg::Pre-Invoke  { "if [ -e /etc/default/snapper ]; then . /etc/default/snapper; fi; if [ -x /usr/bin/snapper ] && [ ! x$DISABLE_APT_SNAPSHOT = 'xyes' ] && [ -e /etc/snapper/configs/root ]; then rm -f /var/tmp/snapper-apt || true ; snapper create -d apt -c number -t pre -p > /var/tmp/snapper-apt || true ; snapper cleanup number || true ; fi"; };
+
+DPkg::Post-Invoke { "if [ -e /etc/default/snapper ]; then . /etc/default/snapper; fi; if [ -x /usr/bin/snapper ] && [ ! x$DISABLE_APT_SNAPSHOT = 'xyes' ] && [ -e /var/tmp/snapper-apt ]; then snapper create -d apt -c number -t post --pre-number=`cat /var/tmp/snapper-apt` || true ; snapper cleanup number || true ; fi"; };
+```
+
+**Mejoras sobre versión anterior:**
+- ✅ Lee configuración centralizada `/etc/default/snapper` (permite activar/desactivar sin tocar este archivo)
+- ✅ Mejor manejo de errores con `|| true` en múltiples puntos
+- ✅ Verifica que `/etc/snapper/configs/root` exista antes de proceder
+- ✅ Limpieza automática con `snapper cleanup number` tras cada snapshot
+- ✅ Usa `/var/tmp` en lugar de `/tmp` (más seguro)
+- ✅ Es la versión oficial de Debian, testeada y mantenida
+
+**Nota:** Esta es la versión instalada por defecto en Debian 13 con snapper. Si necesitas usar la versión anterior (simplificada), puedes reemplazarla con:
+
+```
+// VERSIÓN ANTERIOR (simplificada, no recomendada):
+// DPkg::Pre-Invoke {
+//   "if [ -x /usr/bin/snapper ]; then /usr/bin/snapper create --type=pre --cleanup-algorithm=number --print-number --description='apt-pre' > /tmp/snapper-pre-apt 2>&1; fi";
+// };
+//
+// DPkg::Post-Invoke {
+//   "if [ -x /usr/bin/snapper ]; then /usr/bin/snapper create --type=post --cleanup-algorithm=number --pre-number=$(cat /tmp/snapper-pre-apt 2>/dev/null | tail -1) --description='apt-post' 2>&1; rm -f /tmp/snapper-pre-apt; fi";
+// };
 ```
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
-### 5.5 Habilitar servicios de Snapper
+### 6.5 Habilitar servicios de Snapper
 
 ```bash
 # Habilitar limpieza automática
@@ -1385,7 +1481,7 @@ systemctl status snapper-cleanup.timer
 # (timeline.timer NO lo habilitamos porque TIMELINE_CREATE=no)
 ```
 
-### 5.6 Probar funcionamiento
+### 6.6 Probar funcionamiento
 
 ```bash
 # Crear snapshot manual
@@ -1404,30 +1500,36 @@ sudo apt install -y htop
 # Verificar snapshots APT
 sudo snapper -c root list
 
-# Deberías ver nuevos snapshots:
-# 2 | pre  |   | ... | root | number  | apt-pre  |
-# 3 | post | 2 | ... | root | number  | apt-post |
+# Deberías ver nuevos snapshots tipo pre/post (el número puede variar):
+# 3 | pre  |   | ... | root | number  | apt |
+# 4 | post | 3 | ... | root | number  | apt |
+
+# IMPORTANTE: usa SIEMPRE los IDs reales que te muestre 'snapper list'
+# Ejemplo si ves pre=3 y post=4:
 
 # Ver qué cambió
-sudo snapper -c root status 2..3
+sudo snapper -c root status 3..4
 
 # Ver archivos específicos
-sudo snapper -c root diff 2..3 | head -20
+sudo snapper -c root diff 3..4 | head -20
 ```
 
 ---
 
 ## 7. Configuración de btrbk
 
-### 6.1 Instalar btrbk
+### 7.1 Instalar btrbk
 
 ```bash
 sudo apt install -y btrbk
 ```
 
-### 6.2 Preparar montajes
+### 7.2 Preparar montajes
 
 ```bash
+# Crear punto de montaje si no existe
+sudo mkdir -p /mnt/btrfs-root
+
 # Montar root de BTRFS (necesario para btrbk)
 sudo mount -o subvolid=5 /dev/sda2 /mnt/btrfs-root
 
@@ -1442,11 +1544,12 @@ cat /etc/fstab | grep btrfs-root
 sudo systemctl daemon-reload
 ```
 
-### 6.3 Crear configuración de btrbk
+### 7.3 Crear configuración de btrbk
 
 ```bash
-# Hacer backup de configuración original
-sudo mv /etc/btrbk/btrbk.conf /etc/btrbk/btrbk.conf.original
+# Debian 13 suele traer solo el archivo de ejemplo
+# Crear btrbk.conf a partir del ejemplo
+sudo cp /etc/btrbk/btrbk.conf.example /etc/btrbk/btrbk.conf
 
 # Crear nueva configuración
 sudo nano /etc/btrbk/btrbk.conf
@@ -1471,7 +1574,8 @@ snapshot_preserve       7d
 
 # RETENCIÓN EN PARTICIÓN DE RECUPERACIÓN (sda3)
 # Mantener 14 diarios + 4 semanales (6 semanas total)
-target_preserve_min     14d 4w
+# target_preserve_min acepta un solo valor (no listas como "14d 4w")
+target_preserve_min     14d
 target_preserve         14d 4w
 
 # Compresión durante transferencia
@@ -1486,7 +1590,7 @@ volume /mnt/btrfs-root
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
-### 6.4 Preparar partición de recuperación
+### 7.4 Preparar partición de recuperación
 
 ```bash
 # Montar partición de recuperación
@@ -1503,7 +1607,7 @@ sudo mkdir -p /mnt/backup/snapshots
 ls -la /mnt/backup/
 ```
 
-### 6.5 Probar btrbk
+### 7.5 Probar btrbk
 
 ```bash
 # Prueba en seco (dry-run)
@@ -1529,7 +1633,7 @@ sudo btrfs subvolume list /mnt/backup/
 df -h / /mnt/backup
 ```
 
-### 6.6 Configurar protección de partición de recuperación
+### 7.6 Configurar protección de partición de recuperación
 
 **Script post-backup (montar como solo lectura):**
 
@@ -1577,7 +1681,7 @@ ExecStartPost=/usr/local/bin/btrbk-postrun.sh
 sudo systemctl daemon-reload
 ```
 
-### 6.7 Desmontar partición de recuperación
+### 7.7 Desmontar partición de recuperación
 
 ```bash
 # Desmontar (debe estar desmontada normalmente)
@@ -1588,7 +1692,7 @@ mount | grep backup
 # No debe mostrar nada
 ```
 
-### 6.8 Automatizar btrbk
+### 7.8 Automatizar btrbk
 
 ```bash
 # Habilitar timer (corre diariamente a medianoche)
@@ -1608,7 +1712,7 @@ systemctl list-timers btrbk.timer
 
 ## 8. grub-btrfs
 
-### 7.1 Instalación manual desde GitHub
+### 8.1 Instalación manual desde GitHub
 
 ```bash
 # Instalar git
@@ -1628,7 +1732,7 @@ sudo make install
 # (puede mostrar warning - ignorar)
 ```
 
-### 7.2 Configurar grub-btrfs (SIMPLIFICADO con @)
+### 8.2 Configurar grub-btrfs (SIMPLIFICADO con @)
 
 ```bash
 # Editar configuración
@@ -1647,17 +1751,16 @@ GRUB_BTRFS_MKCONFIG=/usr/sbin/grub-mkconfig
 # Línea ~100: Script check (verificar)
 GRUB_BTRFS_SCRIPT_CHECK=grub-script-check
 
-# Línea ~140: Directorio de snapshots
-GRUB_BTRFS_SNAPSHOT_DIRNAME="/.snapshots"
-
 # Línea ~160: Parámetros de kernel (vacío)
 GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS=""
 
 # Línea ~270: Límite de snapshots mostrados
 GRUB_BTRFS_LIMIT="20"
 
-# Línea ~300: Solo snapshots de Snapper
-GRUB_BTRFS_SNAPSHOT_FILTER="snapper"
+# Nota: en algunas versiones (como la instalada desde GitHub en Debian 13)
+# NO existen estas variables y no deben agregarse:
+# - GRUB_BTRFS_SNAPSHOT_DIRNAME
+# - GRUB_BTRFS_SNAPSHOT_FILTER
 
 # ✅ YA NO NECESITAS configurar ROOTFLAGS ni OVERRIDE
 # Con @ estándar, grub-btrfs detecta automáticamente
@@ -1665,7 +1768,7 @@ GRUB_BTRFS_SNAPSHOT_FILTER="snapper"
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
-### 7.3 Habilitar servicio
+### 8.3 Habilitar servicio
 
 ```bash
 # Habilitar grub-btrfsd (detección automática)
@@ -1675,13 +1778,15 @@ sudo systemctl enable --now grub-btrfsd
 systemctl status grub-btrfsd
 ```
 
-### 7.4 Actualizar GRUB
+### 8.4 Actualizar GRUB
 
 ```bash
 # Actualizar configuración de GRUB
 sudo update-grub
 
-# ✅ Debería detectar snapshots sin warnings de UUID
+# Puede aparecer este warning sin romper el arranque:
+# "UUID of the root subvolume is not available"
+# Si aparece, grub-btrfs puede no generar /boot/grub/grub-btrfs.cfg
 
 # Verificar si se creó archivo de snapshots
 ls -la /boot/grub/grub-btrfs.cfg
@@ -1690,7 +1795,33 @@ ls -la /boot/grub/grub-btrfs.cfg
 sudo head -50 /boot/grub/grub-btrfs.cfg
 ```
 
-### 7.5 Verificar en próximo reinicio
+**Troubleshooting (si NO se genera `grub-btrfs.cfg`):**
+
+Si `update-grub` muestra:
+```
+UUID of the root subvolume is not available
+```
+puede ser un problema de parseo en `/etc/grub.d/41_snapshots-btrfs`.
+
+Aplicar fix (con backup previo):
+
+```bash
+# Backup del script original
+sudo cp /etc/grub.d/41_snapshots-btrfs /etc/grub.d/41_snapshots-btrfs.bak
+
+# Fix de regex para awk (compatibilidad)
+sudo sed -i 's/\\s\*/[[:space:]]*/g' /etc/grub.d/41_snapshots-btrfs
+
+# Regenerar GRUB
+sudo update-grub
+
+# Verificar que ahora existe el archivo
+ls -la /boot/grub/grub-btrfs.cfg
+```
+
+Si el archivo existe y tiene entradas de snapshots, el submenú debería aparecer en el próximo reinicio.
+
+### 8.5 Verificar en próximo reinicio
 
 ```bash
 # Reiniciar para probar
@@ -1710,7 +1841,7 @@ sudo reboot
 
 **Entrada manual para arrancar desde partición de recuperación**
 
-### 8.1 Obtener información necesaria
+### 9.1 Obtener información necesaria
 
 ```bash
 # UUID de sda3 (recuperación)
@@ -1728,7 +1859,7 @@ uname -r
 # Anotar (ej: 6.12.74+deb13+1-amd64)
 ```
 
-### 8.2 Crear entrada custom en GRUB
+### 9.2 Crear entrada custom en GRUB
 
 ```bash
 sudo nano /etc/grub.d/40_custom
@@ -1765,7 +1896,7 @@ menuentry 'Debian RECOVERY (desde partición de recuperación sda3)' --class deb
 sudo chmod +x /etc/grub.d/40_custom
 ```
 
-### 8.3 Actualizar GRUB
+### 9.3 Actualizar GRUB
 
 ```bash
 sudo update-grub
@@ -1774,7 +1905,7 @@ sudo update-grub
 grep -A 3 "menuentry.*RECOVERY" /boot/grub/grub.cfg
 ```
 
-### 8.4 Probar entrada (opcional)
+### 9.4 Probar entrada (opcional)
 
 ```bash
 # Reiniciar
@@ -1794,7 +1925,7 @@ sudo reboot
 
 ## 10. Procedimientos de Recuperación
 
-### 9.1 Crear documento de procedimientos
+### 10.1 Crear documento de procedimientos
 
 ```bash
 # Crear directorio de documentación
@@ -1982,7 +2113,7 @@ Retención: 7 snapshots en sda2, 18 en sda3
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
-### 9.2 Crear Live USB de recuperación
+### 10.2 Crear Live USB de recuperación
 
 **Desde tu host (no la VM):**
 
@@ -1995,7 +2126,7 @@ Retención: 7 snapshots en sda2, 18 en sda3
 
 ## 11. Instalación en Notebook Física
 
-### 10.1 Diferencias VM vs Notebook
+### 11.1 Diferencias VM vs Notebook
 
 **Configuración que CAMBIA:**
 
@@ -2026,7 +2157,7 @@ Notebook física:
 ✅ Procedimientos de recuperación
 ```
 
-### 10.2 Preparación notebook
+### 11.2 Preparación notebook
 
 **ANTES de instalar:**
 
@@ -2040,7 +2171,7 @@ Notebook física:
 4. Probar arranque desde USB (sin instalar)
 ```
 
-### 10.3 Ajustes específicos para notebook
+### 11.3 Ajustes específicos para notebook
 
 **Durante instalación:**
 
@@ -2080,7 +2211,7 @@ Regla: Recovery = ~20-25% del tamaño del sistema
 sudo systemctl enable fstrim.timer
 ```
 
-### 10.4 Checklist de instalación en notebook
+### 11.4 Checklist de instalación en notebook
 
 ```
 Pre-instalación:
@@ -2123,7 +2254,7 @@ Verificación final:
 
 ## 12. Verificación y Mantenimiento
 
-### 11.1 Comandos de verificación diaria
+### 12.1 Comandos de verificación diaria
 
 ```bash
 # Ver snapshots locales
@@ -2148,7 +2279,7 @@ systemctl status grub-btrfsd
 sudo journalctl -u btrbk.service -n 50
 ```
 
-### 11.2 Mantenimiento semanal
+### 12.2 Mantenimiento semanal
 
 ```bash
 # Limpiar snapshots viejos manualmente (si es necesario)
@@ -2166,7 +2297,7 @@ sudo btrfs scrub start /
 sudo btrfs scrub status /
 ```
 
-### 11.3 Mantenimiento mensual
+### 12.3 Mantenimiento mensual
 
 ```bash
 # Verificar salud del disco (notebook física)
@@ -2186,7 +2317,7 @@ ls -lth /mnt/backup/snapshots/
 sudo umount /mnt/backup
 ```
 
-### 11.4 Script de verificación automática
+### 12.4 Script de verificación automática
 
 ```bash
 sudo nano /usr/local/bin/check-backup-health.sh
@@ -2265,7 +2396,7 @@ sudo check-backup-health.sh
 
 ## 13. Próximos Pasos
 
-### 12.1 Crear snapshot "Sistema base listo"
+### 13.1 Crear snapshot "Sistema base listo"
 
 ```bash
 # Crear snapshot del sistema base completamente configurado
@@ -2278,7 +2409,7 @@ sudo btrbk run
 sudo snapper -c root list
 ```
 
-### 12.2 Instalar entorno de escritorio
+### 13.2 Instalar entorno de escritorio
 
 **Para KDE Plasma mínimo:**
 
@@ -2299,7 +2430,7 @@ sudo reboot
 sudo snapper -c root create -d "KDE Plasma instalado y funcionando"
 ```
 
-### 12.3 Personalización (Windows 11 style)
+### 13.3 Personalización (Windows 11 style)
 
 Esto será para otra conversación, pero los pasos base:
 
