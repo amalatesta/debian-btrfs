@@ -2513,6 +2513,100 @@ sudo chmod +x /usr/local/bin/check-backup-health.sh
 sudo check-backup-health.sh
 ```
 
+### 12.5 Mostrar validación automática al iniciar sesión
+
+Esto muestra al abrir terminal (TTY o terminal del entorno gráfico) un resumen rápido de contexto de arranque:
+
+- Si estás en `NORMAL` (sda2, subvol `@`)
+- Si estás en `RECOVERY` (sda3/snapshot)
+- Dispositivo y subvolumen montados en `/` y `/home`
+- Kernel activo
+
+**Crear script global:**
+
+```bash
+sudo nano /usr/local/bin/show-boot-context.sh
+```
+
+**Contenido:**
+
+```bash
+#!/usr/bin/env bash
+set -u
+
+once_per_boot=0
+if [[ "${1:-}" == "--once-per-boot" ]]; then
+   once_per_boot=1
+fi
+
+uid_val="$(id -u)"
+boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)"
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/${uid_val}}"
+stamp_file="${runtime_dir}/.boot-context-${boot_id}"
+
+if [[ "$once_per_boot" -eq 1 ]]; then
+   if [[ -f "$stamp_file" ]]; then
+      exit 0
+   fi
+   touch "$stamp_file" 2>/dev/null || true
+fi
+
+root_src="$(findmnt -n -o SOURCE / 2>/dev/null || echo '?')"
+root_opts="$(findmnt -n -o OPTIONS / 2>/dev/null || echo '?')"
+home_src="$(findmnt -n -o SOURCE /home 2>/dev/null || echo 'not-mounted')"
+home_opts="$(findmnt -n -o OPTIONS /home 2>/dev/null || echo '-')"
+root_subvol="$(echo "$root_opts" | tr ',' '\n' | grep '^subvol=' | head -1 | cut -d= -f2-)"
+home_subvol="$(echo "$home_opts" | tr ',' '\n' | grep '^subvol=' | head -1 | cut -d= -f2-)"
+kernel="$(uname -r 2>/dev/null || echo '?')"
+
+mode="NORMAL"
+if echo "$root_src $root_subvol" | grep -Eq 'sda3|/snapshots/|@\.20[0-9]{10}T[0-9]{4}'; then
+   mode="RECOVERY"
+fi
+
+printf '\n'
+echo "============================================================"
+echo " Boot Context Check"
+echo "============================================================"
+echo " Mode      : ${mode}"
+echo " Kernel    : ${kernel}"
+echo " Root      : ${root_src}  subvol=${root_subvol:-unknown}"
+echo " Home      : ${home_src}  subvol=${home_subvol:-unknown}"
+echo ""
+echo " Quick commands:"
+echo "   findmnt /"
+echo "   findmnt /home"
+echo "   sudo btrfs subvolume show / | grep 'Name:'"
+echo "============================================================"
+
+if [[ "$mode" == "RECOVERY" ]]; then
+   echo "WARNING: You are running from recovery snapshot."
+   echo "         Verify before doing long-term changes."
+   echo "============================================================"
+fi
+```
+
+**Permisos:**
+
+```bash
+sudo chmod +x /usr/local/bin/show-boot-context.sh
+```
+
+**Ejecutar automáticamente en shells interactivas:**
+
+```bash
+sudo nano /etc/bash.bashrc
+```
+
+Agregar al final:
+
+```bash
+# Show boot context once per boot for interactive shells.
+if [ -x /usr/local/bin/show-boot-context.sh ]; then
+   /usr/local/bin/show-boot-context.sh --once-per-boot
+fi
+```
+
 ---
 
 ## 13. Próximos Pasos
