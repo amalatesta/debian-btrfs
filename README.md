@@ -1881,9 +1881,9 @@ sudo reboot
 ### 9.1 Obtener información necesaria
 
 ```bash
-# UUID de sda3 (recuperación)
-sudo blkid /dev/sda3 | grep -o 'UUID="[^"]*"'
-# Anotar UUID (ej: UUID="abcd-1234-efgh-5678")
+# UUID del filesystem de sda3 (recuperación)
+sudo blkid -s UUID -o value /dev/sda3
+# Anotar UUID (ej: abcd-1234-efgh-5678)
 
 # Ver snapshot más reciente en sda3
 sudo mount /dev/sda3 /mnt/backup
@@ -1914,16 +1914,18 @@ menuentry 'Debian RECOVERY (desde partición de recuperación sda3)' --class deb
     insmod part_gpt
     insmod btrfs
     
-    # UUID de sda3 (CAMBIAR por tu UUID)
+   # UUID del filesystem BTRFS de sda3 (CAMBIAR por tu UUID)
     search --no-floppy --fs-uuid --set=root abcd-1234-efgh-5678
     
-    # Kernel (CAMBIAR versión y fecha de snapshot)
-    linux /boot/vmlinuz-6.12.74+deb13+1-amd64 root=UUID=abcd-1234-efgh-5678 rootflags=subvol=snapshots/@.20260328T1851 ro quiet
+   # Kernel dentro del snapshot de recuperación (CAMBIAR versión y fecha)
+   linux /snapshots/@.20260328T1851/boot/vmlinuz-6.12.74+deb13+1-amd64 root=UUID=abcd-1234-efgh-5678 rootflags=subvol=snapshots/@.20260328T1851 ro quiet
     
-    # Initrd (CAMBIAR versión si es diferente)
-    initrd /boot/initrd.img-6.12.74+deb13+1-amd64
+   # Initrd dentro del snapshot de recuperación (CAMBIAR versión si es diferente)
+   initrd /snapshots/@.20260328T1851/boot/initrd.img-6.12.74+deb13+1-amd64
 }
 ```
+
+**Importante:** `search --fs-uuid` debe usar el `UUID` del filesystem, no el `PARTUUID` de la partición.
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
