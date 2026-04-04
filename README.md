@@ -2668,7 +2668,8 @@ Agregar al final:
 # Boot context banner for all users:
 # - TTY/SSH: show on every login shell
 # - Graphical terminal: show once per boot
-if [ -x /usr/local/bin/show-boot-context.sh ]; then
+if [ -x /usr/local/bin/show-boot-context.sh ] && [ -z "${BOOT_CONTEXT_BANNER_SHOWN-}" ]; then
+   BOOT_CONTEXT_BANNER_SHOWN=1
    if [ -n "${DISPLAY-}${WAYLAND_DISPLAY-}" ]; then
       /usr/local/bin/show-boot-context.sh --once-per-boot
    else
@@ -2677,14 +2678,7 @@ if [ -x /usr/local/bin/show-boot-context.sh ]; then
 fi
 ```
 
-**Para nuevos usuarios (terminal gráfica también):** editar `/etc/skel/.bashrc` y agregar después del bloque `case $- ... esac`:
-
-```bash
-# Load global interactive shell settings.
-if [ -f /etc/bash.bashrc ]; then
-   . /etc/bash.bashrc
-fi
-```
+**Nota:** no hace falta modificar `~/.bashrc` ni `/etc/skel/.bashrc`; con `/etc/bash.bashrc` alcanza para todos los usuarios.
 
 ---
 
