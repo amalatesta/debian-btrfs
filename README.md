@@ -1872,11 +1872,11 @@ sudo reboot
 
 ---
 
-## 9. Entrada de Emergencia en GRUB (✅ VALIDADO)
+## 9. Entrada de Emergencia en GRUB (✅ COMPLETAMENTE VALIDADA)
 
-**Entrada manual para arrancar desde partición de recuperación**
+**Entrada manual con submenú de confirmación para arrancar desde partición de recuperación**
 
-> ✅ **Sección validada**: Entrada creada en `/etc/grub.d/40_custom` y verificada en GRUB
+> ✅ **Sección completamente validada**: Submenú de emergencia creado, probado y funcionando. Arranca desde sda3 snapshot correctamente. No es posible arrancar por error.
 
 ### 9.1 Obtener información necesaria
 
@@ -1898,6 +1898,8 @@ uname -r
 
 ### 9.2 Crear entrada custom en GRUB
 
+**La entrada usa un submenu** para evitar arranques accidentales. Al seleccionarla en GRUB aparece un segundo nivel donde hay que confirmar.
+
 ```bash
 sudo nano /etc/grub.d/40_custom
 ```
@@ -1909,23 +1911,39 @@ sudo nano /etc/grub.d/40_custom
 exec tail -n +3 $0
 # This file provides an easy way to add custom menu entries.
 
-menuentry 'Debian RECOVERY (desde partición de recuperación sda3)' --class debian --class gnu-linux {
-    insmod gzio
-    insmod part_gpt
-    insmod btrfs
-    
-   # UUID del filesystem BTRFS de sda3 (CAMBIAR por tu UUID)
-    search --no-floppy --fs-uuid --set=root abcd-1234-efgh-5678
-    
-   # Kernel dentro del snapshot de recuperación (CAMBIAR versión y fecha)
-   linux /snapshots/@.20260328T1851/boot/vmlinuz-6.12.74+deb13+1-amd64 root=UUID=abcd-1234-efgh-5678 rootflags=subvol=snapshots/@.20260328T1851 ro quiet
-    
-   # Initrd dentro del snapshot de recuperación (CAMBIAR versión si es diferente)
-   initrd /snapshots/@.20260328T1851/boot/initrd.img-6.12.74+deb13+1-amd64
+submenu '⚠ Debian RECOVERY (partición sda3) >' {
+    menuentry 'Confirmar: arrancar desde sda3 @.20260328T1851 (EMERGENCIA)' --class debian --class gnu-linux {
+        insmod gzio
+        insmod part_gpt
+        insmod btrfs
+
+        # UUID del filesystem BTRFS de sda3 (CAMBIAR por tu UUID)
+        search --no-floppy --fs-uuid --set=root abcd-1234-efgh-5678
+
+        # Kernel dentro del snapshot de recuperación en sda3 (CAMBIAR versión y fecha)
+        linux /snapshots/@.20260328T1851/boot/vmlinuz-6.12.74+deb13+1-amd64 root=UUID=abcd-1234-efgh-5678 rootflags=subvol=snapshots/@.20260328T1851 ro quiet
+
+        # Initrd dentro del snapshot de recuperación en sda3 (CAMBIAR versión si es diferente)
+        initrd /snapshots/@.20260328T1851/boot/initrd.img-6.12.74+deb13+1-amd64
+    }
 }
 ```
 
-**Importante:** `search --fs-uuid` debe usar el `UUID` del filesystem, no el `PARTUUID` de la partición.
+**Comportamiento en GRUB:**
+```
+Menú principal:
+├── Debian GNU/Linux                          ← arranque normal
+├── Advanced options for Debian               ← submenú de kernels
+├── ⚠ Debian RECOVERY (partición sda3) >     ← entra al submenú
+└── UEFI Firmware Settings
+
+Al seleccionar RECOVERY:
+└── Confirmar: arrancar desde sda3 @.20260328T1851 (EMERGENCIA)  ← confirmar aquí
+```
+
+**Importante:**
+- `search --fs-uuid` debe usar el `UUID` del filesystem (`blkid -s UUID -o value /dev/sda3`), **no el `PARTUUID`**.
+- El kernel e initrd van dentro del snapshot en sda3: `/snapshots/@.../boot/vmlinuz-...`
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
