@@ -86,6 +86,7 @@ El propósito es contar con una guía clara y reproducible que permita:
    - [6.4 Configurar snapshots PRE/POST para APT](#64-configurar-snapshots-prepost-para-apt)
    - [6.5 Habilitar servicios de Snapper](#65-habilitar-servicios-de-snapper)
    - [6.6 Probar funcionamiento](#66-probar-funcionamiento)
+   - [6.7 Snapshots para /home (opcional)](#67-snapshots-para-home-opcional)
 7. [Configuración de btrbk](#7-configuración-de-btrbk)
    - [7.1 Instalar btrbk](#71-instalar-btrbk)
    - [7.2 Preparar montajes](#72-preparar-montajes)
@@ -1548,6 +1549,33 @@ sudo snapper -c root status 3..4
 # Ver archivos específicos
 sudo snapper -c root diff 3..4 | head -20
 ```
+
+### 6.7 Snapshots para /home (opcional)
+
+> Esta sección es **opcional** y no forma parte del flujo base requerido de la guía.
+> Úsala si quieres versionado de archivos de usuario además de snapshots del sistema.
+
+```bash
+# Crear configuración de Snapper para /home
+sudo snapper -c home create-config /home
+
+# Política sugerida para /home (timeline activado)
+sudo snapper -c home set-config "TIMELINE_CREATE=yes"
+sudo snapper -c home set-config "TIMELINE_LIMIT_HOURLY=12"
+sudo snapper -c home set-config "TIMELINE_LIMIT_DAILY=7"
+sudo snapper -c home set-config "TIMELINE_LIMIT_WEEKLY=4"
+sudo snapper -c home set-config "TIMELINE_LIMIT_MONTHLY=3"
+sudo snapper -c home set-config "TIMELINE_LIMIT_YEARLY=0"
+
+# Snapshot inicial manual de /home
+sudo snapper -c home create -d "Home base inicial"
+
+# Verificar
+sudo snapper -c home list
+```
+
+**Importante:** los snapshots de `/home` no crean entradas de arranque en GRUB.
+Se gestionan con el sistema ya iniciado (snapper diff/status/restore de archivos en home).
 
 ---
 
