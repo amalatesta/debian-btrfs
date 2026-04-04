@@ -1944,6 +1944,38 @@ sudo update-grub
 grep -A 3 "menuentry.*RECOVERY" /boot/grub/grub.cfg
 ```
 
+### 9.3.1 Congelar el estado actual antes de probar la entrada
+
+**Recomendado:** antes de arrancar la entrada `Debian RECOVERY`, crear un snapshot nuevo del sistema actual, copiarlo a `sda3` y apuntar `40_custom` a ese snapshot recién replicado.
+
+```bash
+# 1. Crear snapshot local del estado actual
+sudo snapper -c root create -d "Antes de validar entrada recovery"
+
+# 2. Replicarlo a sda3
+sudo mount /dev/sda3 /mnt/backup
+sudo btrbk run
+ls -lt /mnt/backup/snapshots/ | head -5
+sudo umount /mnt/backup
+
+# 3. Tomar nota del snapshot más reciente en sda3
+#    Ejemplo: @.20260403T2239
+
+# 4. Editar /etc/grub.d/40_custom para usar ese snapshot nuevo
+sudo nano /etc/grub.d/40_custom
+
+# 5. Actualizar las dos rutas del bloque recovery:
+#    linux  /snapshots/@.YYYYMMDDTHHMM/boot/vmlinuz-<kernel> \
+#           root=UUID=<uuid-sda3> rootflags=subvol=snapshots/@.YYYYMMDDTHHMM ro quiet
+#    initrd /snapshots/@.YYYYMMDDTHHMM/boot/initrd.img-<kernel>
+
+# 6. Regenerar GRUB y verificar
+sudo update-grub
+sudo grep -A 12 "menuentry 'Debian RECOVERY" /boot/grub/grub.cfg
+```
+
+**Objetivo:** si la prueba falla o el snapshot de recovery está desactualizado, no arrancarás un estado viejo por error.
+
 ### 9.4 Probar entrada (opcional)
 
 ```bash
@@ -1957,7 +1989,15 @@ sudo reboot
 # Debian RECOVERY (desde partición de recuperación sda3)  ← NUEVA
 # ...
 
-# NO la selecciones aún (solo verifica que aparece)
+# Seleccionarla para validar que arranca desde sda3
+```
+
+**Después del arranque**, validar que realmente estás sobre el snapshot de recuperación:
+
+```bash
+mount | grep ' / '
+btrfs subvolume show /
+uname -r
 ```
 
 ---
