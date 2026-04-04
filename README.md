@@ -93,9 +93,9 @@ El propósito es contar con una guía clara y reproducible que permita:
    - [7.3 Crear configuración de btrbk](#73-crear-configuración-de-btrbk)
    - [7.4 Preparar partición de recuperación](#74-preparar-partición-de-recuperación)
    - [7.5 Probar btrbk](#75-probar-btrbk)
-   - [7.6 Configurar protección de partición de recuperación](#76-configurar-protección-de-partición-de-recuperación)
-   - [7.7 Desmontar partición de recuperación](#77-desmontar-partición-de-recuperación)
-   - [7.8 Automatizar btrbk](#78-automatizar-btrbk)
+   - [7.6 Configurar protección estricta de partición de recuperación](#76-configurar-protección-estricta-de-partición-de-recuperación)
+   - [7.7 Estado normal de la partición de recuperación](#77-estado-normal-de-la-partición-de-recuperación)
+   - [7.8 Automatizar btrbk (hibrido: evento + timer)](#78-automatizar-btrbk-hibrido-evento--timer)
 8. [grub-btrfs](#8-grub-btrfs)
    - [8.1 Instalación manual desde GitHub](#81-instalación-manual-desde-github)
    - [8.2 Configurar grub-btrfs](#82-configurar-grub-btrfs-simplificado-con-)
@@ -1505,9 +1505,9 @@ DPkg::Post-Invoke { "if [ -e /etc/default/snapper ]; then . /etc/default/snapper
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
-### 6.4.1 (Opcional recomendado) Disparar btrbk tras transacciones APT exitosas
+### 6.4.1 (Opcional recomendado) Disparar btrbk.service tras transacciones APT exitosas
 
-> Este hook complementa a Snapper: al terminar `apt` con éxito, lanza `btrbk run` en segundo plano.
+> Este hook complementa a Snapper: al terminar `apt` con éxito, lanza `btrbk.service` en segundo plano.
 > No bloquea `apt` y reduce la ventana entre snapshot local y réplica en sda3.
 
 ```bash
@@ -1518,10 +1518,10 @@ sudo nano /etc/apt/apt.conf.d/81btrbk-trigger
 **Contenido:**
 
 ```
-// Dispara btrbk en segundo plano luego de una transaccion dpkg exitosa.
-// Mantiene apt rapido: systemd-run ejecuta de forma asincronica.
-DPkg::Post-Invoke-Success {
-   "if [ -x /usr/bin/systemd-run ] && [ -x /usr/sbin/btrbk ]; then /usr/bin/systemd-run --collect --no-block --description='btrbk run after apt transaction' /usr/sbin/btrbk run || true; fi";
+// Dispara btrbk.service en segundo plano luego de una transaccion dpkg.
+// Se usa Post-Invoke porque es el mismo punto en el que Snapper ya se ejecuta correctamente.
+DPkg::Post-Invoke {
+   "if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl start --no-block btrbk.service || true; fi";
 };
 ```
 
@@ -1725,9 +1725,9 @@ sudo btrfs subvolume list /mnt/backup/
 df -h / /mnt/backup
 ```
 
-### 7.6 Configurar protección de partición de recuperación
+### 7.6 Configurar protección estricta de partición de recuperación
 
-**Script post-backup (montar como solo lectura):**
+**Script post-backup (actualizar GRUB y desmontar):**
 
 ```bash
 sudo nano /usr/local/bin/btrbk-postrun.sh
@@ -1738,11 +1738,44 @@ sudo nano /usr/local/bin/btrbk-postrun.sh
 ```bash
 #!/bin/bash
 # Script post-ejecución de btrbk
-# Remontar partición de recuperación como solo lectura
+# 1. Actualizar entrada GRUB emergency al último snapshot de sda3
+# 2. Desmontar partición de recuperación al finalizar
 
-if mountpoint -q /mnt/backup; then
-    mount -o remount,ro /mnt/backup
-    logger "btrbk-postrun: Partición de recuperación remontada como solo lectura"
+if ! mountpoint -q /mnt/backup; then
+   logger "btrbk-postrun: /mnt/backup no está montado, saltando"
+   exit 0
+fi
+
+LATEST_SNAPSHOT=$(btrfs subvolume list /mnt/backup 2>/dev/null | \
+   awk '/@\.[0-9][0-9][0-9][0-9][0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9]/ {path=$NF; gsub(/.*@\./, "@.", path); print path}' | \
+   sort | \
+   tail -n 1)
+
+if [ -z "$LATEST_SNAPSHOT" ]; then
+   logger "btrbk-postrun: No se encontró snapshot válido en sda3"
+   exit 1
+fi
+
+TMPFILE=$(mktemp)
+if cat /etc/grub.d/40_custom | sed \
+   -e "s|arrancar desde sda3 @\.[0-9]\{8\}T[0-9]\{4\}|arrancar desde sda3 ${LATEST_SNAPSHOT}|g" \
+   -e "s|snapshots/@\.[0-9]\{8\}T[0-9]\{4\}|snapshots/${LATEST_SNAPSHOT}|g" > "$TMPFILE"; then
+   mv "$TMPFILE" /etc/grub.d/40_custom
+   chmod 755 /etc/grub.d/40_custom
+else
+   rm -f "$TMPFILE"
+   logger "btrbk-postrun: Error actualizando 40_custom"
+   exit 1
+fi
+
+/usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || logger "btrbk-postrun: advertencia - grub-mkconfig falló"
+
+if umount /mnt/backup 2>/dev/null; then
+   logger "btrbk-postrun: Partición de recuperación desmontada"
+else
+   mount -o remount,ro /mnt/backup 2>/dev/null
+   logger "btrbk-postrun: No se pudo desmontar /mnt/backup; queda remontada como solo lectura"
+   exit 1
 fi
 ```
 
@@ -1762,6 +1795,7 @@ sudo systemctl edit btrbk.service
 
 ```
 [Service]
+ExecStartPre=/bin/sh -c 'if mountpoint -q /mnt/backup; then mount -o remount,rw /mnt/backup; else mount /mnt/backup; fi'
 ExecStartPost=/usr/local/bin/btrbk-postrun.sh
 ```
 
@@ -1773,15 +1807,12 @@ ExecStartPost=/usr/local/bin/btrbk-postrun.sh
 sudo systemctl daemon-reload
 ```
 
-### 7.7 Desmontar partición de recuperación
+### 7.7 Estado normal de la partición de recuperación
 
 ```bash
-# Desmontar (debe estar desmontada normalmente)
-sudo umount /mnt/backup
-
-# Verificar
+# Verificar que normalmente quede desmontada
 mount | grep backup
-# No debe mostrar nada
+# No debe mostrar nada en estado normal
 ```
 
 ### 7.8 Automatizar btrbk (hibrido: evento + timer)
@@ -1799,7 +1830,9 @@ systemctl list-timers btrbk.timer
 
 **Estrategia recomendada:**
 - `Snapper` crea snapshots locales PRE/POST durante operaciones APT.
-- Hook `81btrbk-trigger` dispara `btrbk run` al finalizar transacciones exitosas.
+- Hook `81btrbk-trigger` dispara `btrbk.service` al finalizar transacciones exitosas.
+- `ExecStartPre` monta `/mnt/backup` solo para la réplica o la remonta en `rw` si ya estaba montada en `ro`.
+- `ExecStartPost` ejecuta `btrbk-postrun.sh` para actualizar la entrada EMERGENCY y desmontar `/mnt/backup`.
 - `btrbk.timer` permanece activo para cubrir cambios fuera de APT y como fallback.
 
 ---
@@ -2066,20 +2099,22 @@ sudo grep -A 12 "menuentry 'Debian RECOVERY" /boot/grub/grub.cfg
 
 1. **Trigger:** Cuando `btrbk run` termina exitosamente (timer o APT hook), systemd ejecuta el script post-run.
 
-2. **Script:** `/usr/local/bin/btrbk-postrun.sh` (si está integrado con btrbk.service):
+2. **Servicio:** `btrbk.service` monta `/mnt/backup` antes de correr `btrbk run`, o la remonta en `rw` si ya estaba visible en `ro`.
+
+3. **Script:** `/usr/local/bin/btrbk-postrun.sh` (si está integrado con btrbk.service):
    - Busca el último snapshot técnico en `/mnt/backup/snapshots/`
    - Extrae su nombre (ej: `@.20260404T0218`)
    - Actualiza **description, linux path, initrd path** en `/etc/grub.d/40_custom`
    - Regenera `grub.cfg`
-   - Remonta `/mnt/backup` como solo lectura
+   - Desmonta `/mnt/backup` al finalizar (o lo deja en solo lectura si no pudo desmontar)
 
-3. **Resultado:** Próximo reboot tendrá entry EMERGENCY apuntando a la réplica más reciente.
+4. **Resultado:** Próximo reboot tendrá entry EMERGENCY apuntando a la réplica más reciente y `sda3` volverá a quedar desmontado.
 
 **Verificar que funciona:**
 
 ```bash
 # Ver último snapshot replicado
-sudo btrfs subvolume list /mnt/backup | grep '\.snapshots/@' | tail -n 1
+sudo btrfs subvolume list /mnt/backup | grep 'snapshots/@' | tail -n 1
 
 # Ver entrada en 40_custom
 sudo sed -n '8,21p' /etc/grub.d/40_custom | grep -E 'menuentry|linux|initrd'
