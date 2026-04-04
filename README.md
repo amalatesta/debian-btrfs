@@ -1505,6 +1505,35 @@ DPkg::Post-Invoke { "if [ -e /etc/default/snapper ]; then . /etc/default/snapper
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
 
+### 6.4.1 (Opcional recomendado) Disparar btrbk tras transacciones APT exitosas
+
+> Este hook complementa a Snapper: al terminar `apt` con éxito, lanza `btrbk run` en segundo plano.
+> No bloquea `apt` y reduce la ventana entre snapshot local y réplica en sda3.
+
+```bash
+# Crear hook separado para btrbk
+sudo nano /etc/apt/apt.conf.d/81btrbk-trigger
+```
+
+**Contenido:**
+
+```
+// Dispara btrbk en segundo plano luego de una transaccion dpkg exitosa.
+// Mantiene apt rapido: systemd-run ejecuta de forma asincronica.
+DPkg::Post-Invoke-Success {
+   "if [ -x /usr/bin/systemd-run ] && [ -x /usr/sbin/btrbk ]; then /usr/bin/systemd-run --collect --no-block --description='btrbk run after apt transaction' /usr/sbin/btrbk run || true; fi";
+};
+```
+
+```bash
+# Verificar que APT cargue el hook
+apt-config dump | grep -i btrbk
+```
+
+**Notas:**
+- Mantén `btrbk.timer` habilitado como red de seguridad (si no hay eventos APT, igualmente habrá sincronización periódica).
+- Si hay múltiples operaciones de paquetes en poco tiempo, pueden dispararse varias ejecuciones; `btrbk` maneja esto de forma segura.
+
 ### 6.5 Habilitar servicios de Snapper
 
 ```bash
@@ -1755,14 +1784,11 @@ mount | grep backup
 # No debe mostrar nada
 ```
 
-### 7.8 Automatizar btrbk
+### 7.8 Automatizar btrbk (hibrido: evento + timer)
 
 ```bash
-# Habilitar timer (corre diariamente a medianoche)
-sudo systemctl enable btrbk.timer
-
-# Iniciar timer
-sudo systemctl start btrbk.timer
+# Mantener timer como respaldo periodico
+sudo systemctl enable --now btrbk.timer
 
 # Verificar estado
 systemctl status btrbk.timer
@@ -1770,6 +1796,11 @@ systemctl status btrbk.timer
 # Ver próxima ejecución
 systemctl list-timers btrbk.timer
 ```
+
+**Estrategia recomendada:**
+- `Snapper` crea snapshots locales PRE/POST durante operaciones APT.
+- Hook `81btrbk-trigger` dispara `btrbk run` al finalizar transacciones exitosas.
+- `btrbk.timer` permanece activo para cubrir cambios fuera de APT y como fallback.
 
 ---
 
@@ -2021,6 +2052,43 @@ sudo grep -A 12 "menuentry 'Debian RECOVERY" /boot/grub/grub.cfg
 ```
 
 **Objetivo:** si la prueba falla o el snapshot de recovery está desactualizado, no arrancarás un estado viejo por error.
+
+### 9.3.2 Actualización automática de entrada EMERGENCY tras btrbk run
+
+> Dato: la entrada de emergency en `/etc/grub.d/40_custom` **se actualiza automáticamente** cada vez que se ejecuta `btrbk run` (ya sea por timer o por trigger APT).
+
+**¿Por qué es importante?**
+- La entrada de emergency debe **siempre apuntar al último snapshot válido en sda3**.
+- Si sda2 es atacado o corrupto, necesitás la versión **más reciente y segura** del respaldo.
+- Sin actualización automática, podrías terminar booteando un snapshot obsoleto.
+
+**¿Cómo funciona?**
+
+1. **Trigger:** Cuando `btrbk run` termina exitosamente (timer o APT hook), systemd ejecuta el script post-run.
+
+2. **Script:** `/usr/local/bin/btrbk-postrun.sh` (si está integrado con btrbk.service):
+   - Busca el último snapshot técnico en `/mnt/backup/snapshots/`
+   - Extrae su nombre (ej: `@.20260404T0218`)
+   - Actualiza **description, linux path, initrd path** en `/etc/grub.d/40_custom`
+   - Regenera `grub.cfg`
+   - Remonta `/mnt/backup` como solo lectura
+
+3. **Resultado:** Próximo reboot tendrá entry EMERGENCY apuntando a la réplica más reciente.
+
+**Verificar que funciona:**
+
+```bash
+# Ver último snapshot replicado
+sudo btrfs subvolume list /mnt/backup | grep '\.snapshots/@' | tail -n 1
+
+# Ver entrada en 40_custom
+sudo sed -n '8,21p' /etc/grub.d/40_custom | grep -E 'menuentry|linux|initrd'
+
+# Deben coincidir
+
+# Ver entrada en GRUB generado
+sudo grep -m 1 'Confirmar: arrancar desde sda3' /boot/grub/grub.cfg
+```
 
 ### 9.4 Probar entrada (opcional)
 
