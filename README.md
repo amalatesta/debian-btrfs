@@ -2517,8 +2517,10 @@ sudo check-backup-health.sh
 
 Esto muestra al abrir terminal (TTY o terminal del entorno gráfico) un resumen rápido de contexto de arranque:
 
-- Si estás en `NORMAL` (sda2, subvol `@`)
-- Si estás en `RECOVERY` (sda3/snapshot)
+- Estado de arranque con semáforo:
+   - `[OK] NORMAL` (verde): raíz en `@`
+   - `[WARN] SNAPSHOT` (amarillo): raíz en snapshot
+   - `[EMERG] EMERGENCY` (rojo): raíz en recovery (`sda3`)
 - Dispositivo y subvolumen montados en `/` y `/home`
 - Kernel activo
 
@@ -2559,16 +2561,44 @@ root_subvol="$(echo "$root_opts" | tr ',' '\n' | grep '^subvol=' | head -1 | cut
 home_subvol="$(echo "$home_opts" | tr ',' '\n' | grep '^subvol=' | head -1 | cut -d= -f2-)"
 kernel="$(uname -r 2>/dev/null || echo '?')"
 
-mode="NORMAL"
-if echo "$root_src $root_subvol" | grep -Eq 'sda3|/snapshots/|@\.20[0-9]{10}T[0-9]{4}'; then
-   mode="RECOVERY"
+mode="SNAPSHOT"
+if [[ "$root_subvol" == "/@" || "$root_subvol" == "@" ]]; then
+   mode="NORMAL"
+elif echo "$root_src" | grep -Eq 'sda3|nvme.*p3'; then
+   mode="EMERGENCY"
 fi
+
+if [[ "$mode" != "EMERGENCY" ]] && echo "$root_subvol" | grep -Eq '/snapshots/|@\.20[0-9]{8}T[0-9]{4}|@\.20[0-9]{6}T[0-9]{4}'; then
+   mode="SNAPSHOT"
+fi
+
+if [[ "$mode" == "SNAPSHOT" ]] && echo "$root_src" | grep -Eq 'sda3|nvme.*p3'; then
+   mode="EMERGENCY"
+fi
+
+color_ok=''
+color_warn=''
+color_danger=''
+color_reset=''
+if [[ -t 1 ]]; then
+   color_ok='\033[1;32m'
+   color_warn='\033[1;33m'
+   color_danger='\033[1;31m'
+   color_reset='\033[0m'
+fi
+
+status_line="${mode}"
+case "$mode" in
+   NORMAL) status_line="${color_ok}[OK] NORMAL${color_reset}" ;;
+   SNAPSHOT) status_line="${color_warn}[WARN] SNAPSHOT${color_reset}" ;;
+   EMERGENCY) status_line="${color_danger}[EMERG] EMERGENCY${color_reset}" ;;
+esac
 
 printf '\n'
 echo "============================================================"
 echo " Boot Context Check"
 echo "============================================================"
-echo " Mode      : ${mode}"
+echo -e " Mode      : ${status_line}"
 echo " Kernel    : ${kernel}"
 echo " Root      : ${root_src}  subvol=${root_subvol:-unknown}"
 echo " Home      : ${home_src}  subvol=${home_subvol:-unknown}"
@@ -2579,8 +2609,14 @@ echo "   findmnt /home"
 echo "   sudo btrfs subvolume show / | grep 'Name:'"
 echo "============================================================"
 
-if [[ "$mode" == "RECOVERY" ]]; then
-   echo "WARNING: You are running from recovery snapshot."
+if [[ "$mode" == "SNAPSHOT" ]]; then
+   echo "WARNING: You are running from snapshot mode."
+   echo "         Changes in /home persist; root behavior depends on snapshot flow."
+   echo "============================================================"
+fi
+
+if [[ "$mode" == "EMERGENCY" ]]; then
+   echo "WARNING: You are running from EMERGENCY recovery snapshot."
    echo "         Verify before doing long-term changes."
    echo "============================================================"
 fi
@@ -2601,9 +2637,24 @@ sudo nano /etc/bash.bashrc
 Agregar al final:
 
 ```bash
-# Show boot context once per boot for interactive shells.
+# Boot context banner for all users:
+# - TTY/SSH: show on every login shell
+# - Graphical terminal: show once per boot
 if [ -x /usr/local/bin/show-boot-context.sh ]; then
-   /usr/local/bin/show-boot-context.sh --once-per-boot
+   if [ -n "${DISPLAY-}${WAYLAND_DISPLAY-}" ]; then
+      /usr/local/bin/show-boot-context.sh --once-per-boot
+   else
+      /usr/local/bin/show-boot-context.sh
+   fi
+fi
+```
+
+**Para nuevos usuarios (terminal gráfica también):** editar `/etc/skel/.bashrc` y agregar después del bloque `case $- ... esac`:
+
+```bash
+# Load global interactive shell settings.
+if [ -f /etc/bash.bashrc ]; then
+   . /etc/bash.bashrc
 fi
 ```
 
