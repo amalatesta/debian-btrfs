@@ -23,6 +23,17 @@ El propósito es contar con una guía clara y reproducible que permita:
 
 ---
 
+## 🟢 Estado de Validación
+
+| Fase | Estado | Notas |
+|------|--------|-------|
+| **Secciones 1-8** | ✅ Completadas | Instalación base, Snapper, btrbk, grub-btrfs validados y funcionando |
+| **Sección 9** | ✅ Validada | Entrada de emergencia en GRUB creada y verificada |
+| **Sección 13.1** | ✅ Completada | Snapshot "Sistema base listo" creado y respaldado en sda3 |
+| **VM VirtualBox** | 🟢 **LISTA** | Todas las características probadas y funcionando. Proceder a instalación física o personalización. |
+
+---
+
 
 
 ## 📋 Tabla de Contenidos
@@ -1837,9 +1848,11 @@ sudo reboot
 
 ---
 
-## 9. Entrada de Emergencia en GRUB
+## 9. Entrada de Emergencia en GRUB (✅ VALIDADO)
 
 **Entrada manual para arrancar desde partición de recuperación**
+
+> ✅ **Sección validada**: Entrada creada en `/etc/grub.d/40_custom` y verificada en GRUB
 
 ### 9.1 Obtener información necesaria
 
@@ -2396,18 +2409,32 @@ sudo check-backup-health.sh
 
 ## 13. Próximos Pasos
 
-### 13.1 Crear snapshot "Sistema base listo"
+### 13.1 Crear snapshot "Sistema base listo" (✅ COMPLETADO)
 
 ```bash
 # Crear snapshot del sistema base completamente configurado
-sudo snapper -c root create -d "Sistema base con Snapper+btrbk+@ configurado"
+sudo snapper -c root create -d "Sistema base con Snapper+btrbk+grub-btrfs configurado"
+
+# Montar partición de recuperación
+sudo mount /dev/sda3 /mnt/backup
 
 # Forzar backup inmediato a sda3
 sudo btrbk run
 
-# Verificar
-sudo snapper -c root list
+# Desmontar partición de recuperación
+sudo umount /mnt/backup
+
+# Verificar snapshot creado
+sudo snapper -c root list | tail -3
 ```
+
+**Importante:** Asegurar que en `/etc/fstab` está configurado:
+
+```bash
+UUID=4e10e56c-665e-4b5c-9892-55bb12509de6 /mnt/btrfs-root btrfs subvolid=5,auto,compress=zstd:3 0 0
+```
+
+(sin `noauto` para que btrbk.timer funcione automáticamente en cada arranque)
 
 ### 13.2 Instalar entorno de escritorio
 
