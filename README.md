@@ -190,6 +190,24 @@ Iniciar VM
 
 ### 2.1 Arrancar instalador
 
+**Opción A: Instalación Gráfica (RECOMENDADA)** ⭐
+
+```
+Menú GRUB del instalador:
+→ Selecciona: "Graphical install"
+→ Enter
+```
+
+**Ventajas:**
+- Interfaz gráfica más clara e intuitiva
+- Menos propenso a errores
+- Particionado manual disponible en el asistente
+- Recomendado para esta guía
+
+---
+
+**Opción B: Expert Install (Alternativa)**
+
 ```
 Menú GRUB del instalador:
 → Selecciona: "Advanced options..."
@@ -197,10 +215,16 @@ Menú GRUB del instalador:
 → Enter
 ```
 
-**¿Por qué Expert Install?**
-- Más control sobre particionado
-- Evita instalación de paquetes innecesarios
-- Permite configuración precisa
+**Ventajas:**
+- Control granular en cada paso
+- Instalación más rápida (sin interfaz gráfica)
+- Para usuarios avanzados
+
+---
+
+**En cualquiera de las dos opciones:**
+- Particionado: Seleccionar "Manual" cuando se pida
+- Software: Desmarcar escritorio (instalar solo SSH + utilidades estándar)
 
 ### 2.2 Configuración inicial
 
@@ -2182,6 +2206,30 @@ Notebook física:
    - Boot order: USB primero
 3. Crear Live USB con Debian 13
 4. Probar arranque desde USB (sin instalar)
+```
+
+### 11.2.1 Tipo de instalación a utilizar
+
+**Recomendación:** Instalación Gráfica con Particionado Manual
+
+```
+Boot desde Live USB:
+→ Selecciona: "Graphical install"
+→ Sigue asistente normal
+→ En particionado: selecciona "Manual"
+→ Crea 4 particiones (EFI, BTRFS sistema, BTRFS recovery, SWAP)
+→ Continúa
+→ En "Software selection" → desmarcar escritorio
+→ Listo
+```
+
+**Alternativa:** Expert Install (si prefieres paso a paso sin UI gráfico)
+
+```
+Boot desde Live USB:
+→ Selecciona: "Advanced options..."
+→ Selecciona: "Expert install"
+→ Sigue instrucciones (igual particionado manual)
 ```
 
 ### 11.3 Ajustes específicos para notebook
