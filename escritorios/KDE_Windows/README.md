@@ -82,34 +82,29 @@ Una vez que KDE arranque:
 - fijarlo al extremo izquierdo del panel
 - anclar Dolphin, Konsole, Firefox/Chromium y Configuracion del sistema
 
-### 3. Tema base
+### 3. Tema visual aplicado (look Windows 11 oscuro)
 
-Configurar desde **System Settings**:
+Configurado desde **System Settings → Appearance**:
 
-- Global Theme: `Breeze Light`
-- Plasma Style: `Breeze`
-- Application Style: `Breeze`
-- Colors: `Breeze Light`
-- Icons: `Breeze`
-- Cursors: `Breeze`
+1. Entrar a **Global Theme** → verificar que `Breeze Dark` esta seleccionado
+2. Hacer clic en **Get New Global Themes** y descargar:
+   - `Fluent Round Dark` (tema Plasma oscuro estilo Windows 11)
+   - `Win11OS-Dark` (incluye fondo de pantalla y splash screen)
+3. Aplicar **Fluent Round Dark** como Plasma Style
+4. Seleccionar el fondo de pantalla que viene con `Win11OS-Dark`
 
-### 4. Comportamiento tipo Windows
+### 4. Pantalla de carga (Splash Screen)
+
+- En **System Settings → Appearance → Splash Screen**
+- Seleccionar `Win11OS-Dark`
+- Muestra una barra de carga estilo Windows 11 al iniciar sesion
+
+### 5. Comportamiento tipo Windows
 
 - doble click para abrir archivos si lo prefieres
 - barra inferior siempre visible
 - area de notificacion compacta
 - escritorio limpio, sin plasmoides innecesarios
-
-### 5. Opcional: look mas cercano a AnduinOS
-
-Si quieres acercarte mas al look moderno tipo Windows 11 / AnduinOS:
-
-- instalar un tema tipo `Fluent` desde KDE Store
-- usar iconos `Fluent` o similares
-- mantener panel inferior con bordes suaves
-- usar fondo claro o neutro, no wallpapers de Windows
-
-Esto es opcional. La base recomendada sigue siendo `Breeze Light`, que es estable y facil de mantener.
 
 ## Rollback / recuperacion
 
