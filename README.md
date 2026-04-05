@@ -21,6 +21,9 @@ El propósito es contar con una guía clara y reproducible que permita:
 
 **Estructura de subvolúmenes:** Estándar `@` y `@home` (compatible con grub-btrfs automático)
 
+**Perfiles de escritorio:**
+- KDE Plasma estilo Windows / AnduinOS-like: [escritorios/KDE_Windows/README.md](escritorios/KDE_Windows/README.md)
+
 ---
 
 ## 🟢 Estado de Validación
