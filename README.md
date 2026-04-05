@@ -96,6 +96,7 @@ El propósito es contar con una guía clara y reproducible que permita:
    - [7.6 Configurar protección estricta de partición de recuperación](#76-configurar-protección-estricta-de-partición-de-recuperación)
    - [7.7 Estado normal de la partición de recuperación](#77-estado-normal-de-la-partición-de-recuperación)
    - [7.8 Automatizar btrbk (hibrido: evento + timer)](#78-automatizar-btrbk-hibrido-evento--timer)
+   - [7.9 Snapshot manual para cambios no-APT (`snapcfg`)](#79-snapshot-manual-para-cambios-no-apt-snapcfg)
 8. [grub-btrfs](#8-grub-btrfs)
    - [8.1 Instalación manual desde GitHub](#81-instalación-manual-desde-github)
    - [8.2 Configurar grub-btrfs](#82-configurar-grub-btrfs-simplificado-con-)
@@ -1834,6 +1835,30 @@ systemctl list-timers btrbk.timer
 - `ExecStartPre` monta `/mnt/backup` solo para la réplica o la remonta en `rw` si ya estaba montada en `ro`.
 - `ExecStartPost` ejecuta `btrbk-postrun.sh` para actualizar la entrada EMERGENCY y desmontar `/mnt/backup`.
 - `btrbk.timer` permanece activo para cubrir cambios fuera de APT y como fallback.
+
+### 7.9 Snapshot manual para cambios no-APT (`snapcfg`)
+
+Cuando haces cambios manuales en configuración (por ejemplo en `/etc`), APT no se ejecuta y por lo tanto no se crea snapshot automático PRE/POST.
+
+Para cubrir ese caso, usar `snapcfg` antes de tocar configuración:
+
+```bash
+# Crear snapshot local (cleanup=number)
+snapcfg "Antes de cambiar sshd_config"
+
+# Crear snapshot local y replicar a sda3 inmediatamente
+snapcfg "Antes de cambiar networkd" --replicate
+```
+
+**Qué hace `snapcfg`:**
+- Crea snapshot en Snapper (`root`) con `cleanup=number`.
+- Si se usa `--replicate`, ejecuta `btrbk.service`.
+- Con eso se actualiza también la entrada EMERGENCY y se desmonta `/mnt/backup` al finalizar.
+
+**Recomendación operativa:**
+- Usar `snapcfg` antes de cambios manuales relevantes de sistema.
+- Dejar APT + hook automático para cambios por paquetes.
+- Mantener timer semanal como red de seguridad.
 
 ---
 
