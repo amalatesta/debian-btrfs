@@ -10,7 +10,7 @@ if command -v snapcfg >/dev/null 2>&1; then
 fi
 
 echo 'sddm shared/default-x-display-manager select sddm' | debconf-set-selections
-DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends kde-plasma-desktop sddm
+DEBIAN_FRONTEND=noninteractive apt install -y task-kde-desktop sddm
 
 systemctl enable sddm
 systemctl set-default graphical.target

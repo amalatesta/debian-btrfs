@@ -25,8 +25,6 @@ Eso deja un punto de rollback local y una replica en `sda3` antes del cambio gra
 
 ## Instalacion
 
-> Perfil elegido: **instalacion minima** y luego agregar paquetes segun necesidad.
-
 ### Opcion recomendada para la VM
 
 Usar el script incluido en esta carpeta:
@@ -43,16 +41,10 @@ chmod +x install_kde_windows.sh
 sudo snapcfg "Antes de instalar KDE Plasma" --replicate
 
 echo 'sddm shared/default-x-display-manager select sddm' | sudo debconf-set-selections
-sudo DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends kde-plasma-desktop sddm
+sudo DEBIAN_FRONTEND=noninteractive apt install -y task-kde-desktop sddm
 
 sudo systemctl enable sddm
 sudo systemctl set-default graphical.target
-```
-
-### Paquetes utiles para agregar despues (opcionales)
-
-```bash
-sudo apt install -y dolphin konsole plasma-nm discover
 ```
 
 ## Verificacion posterior
