@@ -1951,6 +1951,13 @@ GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS=""
 # Línea ~270: Límite de snapshots mostrados
 GRUB_BTRFS_LIMIT="20"
 
+# ✅ CLAVE: Mostrar SOLO snapshots de Snapper en GRUB (excluir btrbk)
+# Los snapshots de btrbk tienen la forma @.FECHA directamente en la raíz Btrfs.
+# Con esta variable, grub-btrfs ignora el subvolumen @ en sí, lo que excluye
+# los snapshots de btrbk (@.20260407T1234) y muestra SOLO los de Snapper
+# (@/.snapshots/N/snapshot).
+GRUB_BTRFS_IGNORE_SPECIFIC_PATH=("@")
+
 # Nota: en algunas versiones (como la instalada desde GitHub en Debian 13)
 # NO existen estas variables y no deben agregarse:
 # - GRUB_BTRFS_SNAPSHOT_DIRNAME
@@ -1961,6 +1968,12 @@ GRUB_BTRFS_LIMIT="20"
 ```
 
 **Guardar:** Ctrl+O, Enter, Ctrl+X
+
+> **¿Por qué solo Snapper y no btrbk en GRUB?**
+> - Snapshots de **Snapper**: `@/.snapshots/N/snapshot` → arrancables, útiles para rollback rápido.
+> - Snapshots de **btrbk**: `@.20260407T1234` en la raíz Btrfs → son backups históricos en `sda3`/`nvme0n1p3`, no están diseñados para arrancar directamente.
+> - Con `GRUB_BTRFS_IGNORE_SPECIFIC_PATH=("@")` grub-btrfs ignora el subvolumen `@` como snapshot arrancable, quedando solo los de Snapper en el menú.
+> - Si alguna vez necesitás arrancar desde un snapshot de btrbk, usá la entrada de emergencia (sección 9).
 
 ### 8.3 Habilitar servicio
 
