@@ -64,7 +64,7 @@ El propósito es contar con una guía clara y reproducible que permita:
    - [3.7 Reinstalar GRUB después de cambios](#s3-reinstalar-grub)
    - [3.8 Al reiniciar debe ocurrir](#s3-al-reiniciar)
    - [3.9 Si el sistema no arranca](#s3-si-no-arranca)
-   - [3.10 Verificar configuración](#310-verificar-configuración)
+   - [3.10 Verificar configuración (antes de reiniciar)](#310-verificar-configuración-antes-de-reiniciar-en-rescue-mode)
    - [3.11 Quitar ISO y arrancar sistema](#311-quitar-iso-y-arrancar-sistema)
    - [3.12 Verificar arranque con subvolúmenes](#312-verificar-arranque-con-subvolúmenes)
 4. [Configurar acceso SSH (Opcional pero recomendado)](#4-configurar-acceso-ssh-opcional-pero-recomendado)
@@ -570,6 +570,8 @@ Execute a shell:
 Presionar Enter en mensaje informativo
 ```
 
+**Nota:** En Rescue Mode normalmente ya estás como `root` (prompt `#`), por lo que los comandos se ejecutan **sin** `sudo`.
+
 ### 3.4 Renombrar a estructura estándar y crear @home
 
 **Comandos a ejecutar:**
@@ -638,6 +640,9 @@ ls /mnt/btrfs/@/home/
 **Antes de continuar, verifica que el renombrado fue exitoso:**
 
 ```bash
+# Si /mnt/btrfs ya estaba montado, desmontar primero
+umount /mnt/btrfs 2>/dev/null || true
+
 # Montar partición root (acceder a la raíz Btrfs sin subvolúmenes)
 # Para NVMe:
 mount -o subvolid=5 /dev/nvme0n1p2 /mnt/btrfs
@@ -646,6 +651,7 @@ mount -o subvolid=5 /dev/sda2 /mnt/btrfs
 
 # Verificar contenido (DEBE mostrar @ NO @rootfs)
 ls -la /mnt/btrfs/
+# Si ves `@` y `@home`, esta parte está OK.
 
 # Verificar subvolúmenes
 btrfs subvolume list /mnt/btrfs
@@ -926,10 +932,12 @@ El que funcione es el nombre real.
 ---
 
 
-### 3.10 Verificar configuración
+### 3.10 Verificar configuración (antes de reiniciar, en Rescue Mode)
+
+Esta verificación aplica mientras sigues en Rescue Mode y `/mnt/btrfs` está montado.
 
 ```bash
-# Verificar sintaxis de fstab
+# Verificar sintaxis de fstab del sistema instalado
 cat /mnt/btrfs/@/etc/fstab
 
 # Listar subvolúmenes finales
@@ -946,6 +954,14 @@ exit
 
 # Seleccionar: Reboot the system
 # → Continue
+```
+
+Si ya reiniciaste y estás en el sistema normal, usa esta validación corta en su lugar:
+
+```bash
+findmnt /
+findmnt /home
+cat /etc/fstab | grep -E 'subvol=@|subvol=@home|/mnt/backup|/mnt/btrfs-root'
 ```
 
 ### 3.11 Quitar ISO y arrancar sistema
