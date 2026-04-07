@@ -2916,6 +2916,58 @@ sudo umount /mnt/backup
 
 ---
 
+## 💻 Casos Aplicados
+
+Esta sección documenta instalaciones concretas realizadas con esta guía, con el hardware específico utilizado y las decisiones tomadas en cada caso.
+
+---
+
+### Caso 1: Dell Latitude 5421
+
+**Fecha:** Abril 2026  
+**Objetivo:** Reemplazar Windows 11 completo por Debian 13 con Btrfs + Snapper + btrbk. Sin dual boot.
+
+#### Hardware
+
+| Componente | Detalle |
+|---|---|
+| **Modelo** | Dell Latitude 5421 |
+| **CPU** | Intel Core i7-11850H @ 2.50 GHz (11ª gen) |
+| **RAM** | 32 GB |
+| **Disco** | NVMe SSD 256 GB (CL1-3D256-Q11 NVMe SSSTC) |
+| **Modo arranque** | UEFI |
+| **Secure Boot** | Activado (desactivado durante instalación) |
+| **BitLocker** | No activo |
+| **Sistema previo** | Windows 11 (borrado completamente) |
+
+#### Decisiones de instalación
+
+| Decisión | Elección | Motivo |
+|---|---|---|
+| Dual boot | No | Reemplazo completo |
+| /home separado | Subvolumen `@home` (no partición) | Flexibilidad de espacio + backup unificado por btrbk |
+| Swap | 33 GB | Hibernación habilitada (≥ RAM de 32 GB) |
+
+#### Esquema de particionado aplicado
+
+| Partición | Tamaño | Tipo | Uso |
+|---|---|---|---|
+| sda1 | 512 MB | FAT32 (EFI) | Arranque UEFI |
+| sda2 | 170 GB | Btrfs | Sistema: subvolúmenes `@` y `@home` |
+| sda3 | 35 GB | Btrfs | Backup btrbk (`noauto`) |
+| sda4 | 33 GB | swap | Hibernación |
+
+**Regla aplicada:** backup ≈ 20% del sistema. Swap = RAM para hibernación.
+
+#### Notas específicas
+
+- Secure Boot se desactiva en BIOS antes de arrancar el installer y puede reactivarse después si se configura shim.
+- NVMe aparece como `nvme0n1` en Linux (no `sda`); ajustar referencias del particionado en consecuencia.
+- Wi-Fi Intel AX201 incluido en el kernel, sin drivers adicionales necesarios.
+- TRIM en SSD: habilitar con `sudo systemctl enable fstrim.timer`.
+
+---
+
 ## ✅ Checklist Final de Instalación Completa
 
 ```
