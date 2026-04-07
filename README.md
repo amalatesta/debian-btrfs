@@ -578,14 +578,18 @@ Presionar Enter en mensaje informativo
 # Crear punto de montaje
 mkdir /mnt/btrfs
 
-# Montar partición BTRFS
-mount /dev/sda2 /mnt/btrfs
+# ⚠️ NOTA: Cambiar según tu disco
+# - NVMe: /dev/nvme0n1p2
+# - SATA: /dev/sda2
+
+# Montar partición BTRFS (cambiar device según tipo de disco)
+mount /dev/nvme0n1p2 /mnt/btrfs
 
 # Verificar contenido (instalador creó @rootfs)
 ls /mnt/btrfs
 # Output: @rootfs
 
-# Listar subvolúmenes existentes
+# Listar subvolúmenes existentes (IMPORTANTE: montar sin subvol para ver raíz real)
 btrfs subvolume list /mnt/btrfs
 # Output: ID 256 gen X top level 5 path @rootfs
 
@@ -634,7 +638,10 @@ ls /mnt/btrfs/@/home/
 **Antes de continuar, verifica que el renombrado fue exitoso:**
 
 ```bash
-# Montar partición root
+# Montar partición root (acceder a la raíz Btrfs sin subvolúmenes)
+# Para NVMe:
+mount -o subvolid=5 /dev/nvme0n1p2 /mnt/btrfs
+# O si tienes SATA/AHCI:
 mount -o subvolid=5 /dev/sda2 /mnt/btrfs
 
 # Verificar contenido (DEBE mostrar @ NO @rootfs)
@@ -676,11 +683,17 @@ ls -la  # Verificar que ahora muestre @
 **Obtener UUIDs:**
 
 ```bash
-# UUID de sda2 (sistema)
+# UUID de partición Btrfs del sistema
+# Para NVMe:
+blkid /dev/nvme0n1p2
+# O si tienes SATA/AHCI:
 blkid /dev/sda2
 # Copiar UUID (ej: 1234-5678-90ab-cdef)
 
-# UUID de sda3 (recuperación)
+# UUID de partición Btrfs de recuperación
+# Para NVMe:
+blkid /dev/nvme0n1p3
+# O si tienes SATA/AHCI:
 blkid /dev/sda3
 # Copiar UUID (ej: abcd-efgh-1234-5678)
 ```
@@ -742,11 +755,17 @@ umount /mnt/btrfs 2>/dev/null
 #### Paso 2: Montar el sistema para chroot
 
 ```bash
-# Montar el subvolumen @ directamente en /mnt
-mount -o subvol=@ /dev/sda2 /mnt
+# Montar el subvolumen @ directamente en /mnt (cambiar device según tipo de disco)
+# NVMe:
+mount -o subvol=@ /dev/nvme0n1p2 /mnt
+# SATA:
+# mount -o subvol=@ /dev/sda2 /mnt
 
-# Montar partición EFI
-mount /dev/sda1 /mnt/boot/efi
+# Montar partición EFI (cambiar device según tipo de disco)
+# NVMe:
+mount /dev/nvme0n1p1 /mnt/boot/efi
+# SATA:
+# mount /dev/sda1 /mnt/boot/efi
 
 # Montar filesystems virtuales (necesarios para GRUB)
 mount --bind /dev /mnt/dev
@@ -760,10 +779,10 @@ mount --bind /sys /mnt/sys
 mount | grep /mnt
 ```
 
-Debes ver:
+Debes ver (adaptado a tu tipo de disco):
 ```
-/dev/sda2 on /mnt type btrfs (...subvol=@...)
-/dev/sda1 on /mnt/boot/efi type vfat
+/dev/nvme0n1p2 on /mnt type btrfs (...subvol=@...)
+/dev/nvme0n1p1 on /mnt/boot/efi type vfat
 devtmpfs on /mnt/dev
 proc on /mnt/proc
 sysfs on /mnt/sys
@@ -780,7 +799,11 @@ Tu prompt debería cambiar. Ahora estás "dentro" del sistema instalado.
 #### Paso 4: Reinstalar GRUB
 
 ```bash
-grub-install /dev/sda
+# Instalar GRUB en el disco completo (no en la partición)
+# NVMe: usar /dev/nvme0n1 (sin el p2)
+grub-install /dev/nvme0n1
+# SATA: usar /dev/sda (sin el número)
+# grub-install /dev/sda
 ```
 
 **Salida esperada:**
