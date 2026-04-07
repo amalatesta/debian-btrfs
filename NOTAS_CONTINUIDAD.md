@@ -33,6 +33,8 @@ Fecha: 2026-04-07
 - Sección 8.3 completada: `grub-btrfsd` habilitado y en ejecución.
 - Sección 8.4 completada: se aplicó fix de compatibilidad en `/etc/grub.d/41_snapshots-btrfs` y `update-grub` detecta snapshots; archivo `/boot/grub/grub-btrfs.cfg` generado correctamente.
 - Sección 8.5 validada post-reinicio: `grub-btrfsd` activo y corriendo, `/boot/grub/grub-btrfs.cfg` presente (31.8K, 26 entries), submenú "Debian snapshots" visible en GRUB.
+- Validación adicional post-reinicio: menú de GRUB corregido para mostrar solo snapshots numerados de Snapper; se confirmaron 11 entradas válidas y quedaron excluidos los subvolúmenes `@.timestamp`.
+- Warning observado al arrancar Debian: `EFI stub: WARNING: Failed to measure data for event ...`; validado como aviso de medición EFI/TPM con Secure Boot activo, sin impacto funcional sobre GRUB, Snapper ni el arranque normal.
 
 ## Punto exacto alcanzado en la instalación física
 
@@ -42,6 +44,7 @@ Fecha: 2026-04-07
 - Sección 5 (Guest Additions) no aplica en notebook física.
 - Sección 9 completada: entrada de emergencia en GRUB creada y verificada (`submenu ⚠ Debian RECOVERY` presente en `/boot/grub/grub.cfg`).
 - **Instalación base COMPLETA**: Debian 13 + Btrfs + Snapper + btrbk + grub-btrfs + entrada de emergencia, todo funcional.
+- Estado operativo validado tras reboot: arranque normal, banner de contexto OK, menú de snapshots limpio y warning EFI clasificado como benigno.
 
 ## Próximos pasos (inmediatos)
 
