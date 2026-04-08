@@ -116,9 +116,14 @@ Objetivo de esta sesión:
 
 - Volver al estado previo a instalar entorno gráfico (snapshot `ID 13`) y seguir trabajando desde allí en modo normal de escritura.
 
-### 1) Creación de snapshot backup del estado actual
+### 1) Creación de snapshot backup del estado actual (opcional)
 
-Comando ejecutado:
+Nota técnica:
+
+- Para `rollback`, **no es obligatorio** crear snapshot manual antes. Snapper ya conserva el estado actual automáticamente durante el rollback.
+- El snapshot manual sigue siendo útil si querés un nombre explícito y controlado.
+
+Comando ejecutado en esta sesión:
 
 ```bash
 sudo snapper -c root create -d "Punto de retorno antes de rollback a ID13"
@@ -139,7 +144,7 @@ sudo snapper -c root delete 23
 ### 3) Comando para traer `ID 13` como principal
 
 ```bash
-sudo snapper -c root rollback 13
+sudo snapper -c root rollback 13 -d "Rollback a ID13 pre-KDE" -u motivo=rollback_pre_kde
 sudo reboot
 ```
 
@@ -166,7 +171,7 @@ sudo ss -tlnp | grep ssh
 Aplicar rollback al snapshot backup:
 
 ```bash
-sudo snapper -c root rollback 24
+sudo snapper -c root rollback 24 -d "Volver a backup ID24" -u motivo=restore_backup_id24
 sudo reboot
 ```
 
