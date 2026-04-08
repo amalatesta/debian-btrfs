@@ -109,3 +109,70 @@ git pull --ff-only
 ```bash
 umount /mnt/btrfs 2>/dev/null || true
 ```
+
+## Continuidad 2026-04-08 (rollback a pre-KDE)
+
+Objetivo de esta sesión:
+
+- Volver al estado previo a instalar entorno gráfico (snapshot `ID 13`) y seguir trabajando desde allí en modo normal de escritura.
+
+### 1) Creación de snapshot backup del estado actual
+
+Comando ejecutado:
+
+```bash
+sudo snapper -c root create -d "Punto de retorno antes de rollback a ID13"
+```
+
+Resultado final vigente:
+
+- Snapshot de respaldo conservado: `ID 24`.
+
+### 2) Eliminación de snapshot repetido
+
+Durante la ejecución se creó un duplicado por reintento. Se limpió con:
+
+```bash
+sudo snapper -c root delete 23
+```
+
+### 3) Comando para traer `ID 13` como principal
+
+```bash
+sudo snapper -c root rollback 13
+sudo reboot
+```
+
+Notas:
+
+- Esto deja el sistema arrancando desde el estado de `ID 13` como raíz principal.
+- Queda en modo escritura (no solo lectura) para seguir trabajando normalmente.
+
+### 4) Reiniciar y luego validar
+
+Después del reboot, validar estado activo y red/SSH:
+
+```bash
+findmnt /
+sudo snapper -c root list | tail -n 30
+ip -4 -brief addr
+ip route | grep default
+sudo systemctl status ssh || sudo systemctl status sshd
+sudo ss -tlnp | grep ssh
+```
+
+### 5) Si hace falta volver al backup actual (`ID 24`)
+
+Aplicar rollback al snapshot backup:
+
+```bash
+sudo snapper -c root rollback 24
+sudo reboot
+```
+
+Luego validar nuevamente:
+
+```bash
+findmnt /
+sudo snapper -c root list | tail -n 30
+```
