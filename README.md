@@ -2975,6 +2975,91 @@ sudo reboot
 sudo snapper -c root create -d "KDE Plasma instalado y funcionando"
 ```
 
+### 13.2.1 Limpiar configuraciones de usuario al volver a pre-escritorio
+
+Cuando hacés rollback a un snapshot pre-escritorio, los **paquetes** vuelven atrás pero las
+**configuraciones de usuario en `/home`** sobreviven porque `@home` es un subvolumen separado
+que no entra en el snapshot de root.
+
+Esto puede causar que al reinstalar el escritorio encuentres comportamientos raros
+(paneles mal configurados, temas rotos, etc.) heredados de la instalación anterior.
+
+**Solución: limpiar las carpetas del escritorio anterior antes de reinstalar.**
+
+> ⚠️ Estos comandos borran configuración de usuario. Hacerlos cuando estés seguro de que
+> no necesitás nada de la instalación anterior del escritorio.
+
+#### KDE Plasma
+
+```bash
+rm -rf ~/.config/kde* ~/.config/KDE* \
+       ~/.config/plasma* ~/.config/Plasma* \
+       ~/.config/kwin* ~/.config/kscreen* \
+       ~/.config/kdedefaults \
+       ~/.local/share/plasma* \
+       ~/.local/share/kded* \
+       ~/.local/share/kwin* \
+       ~/.cache/plasma* \
+       ~/.cache/kwin* \
+       ~/.cache/ksycoca*
+```
+
+Display manager SDDM (configuración del sistema, no de usuario):
+
+```bash
+sudo rm -rf /etc/sddm.conf /etc/sddm.conf.d/
+```
+
+#### GNOME
+
+```bash
+rm -rf ~/.config/gnome-* \
+       ~/.config/dconf \
+       ~/.local/share/gnome-* \
+       ~/.cache/gnome-*
+```
+
+Display manager GDM:
+
+```bash
+sudo rm -rf /etc/gdm3/
+```
+
+#### XFCE
+
+```bash
+rm -rf ~/.config/xfce4/ \
+       ~/.cache/xfce4/ \
+       ~/.config/Thunar/
+```
+
+Display manager LightDM:
+
+```bash
+sudo rm -rf /etc/lightdm/
+```
+
+#### LXQt
+
+```bash
+rm -rf ~/.config/lxqt/ \
+       ~/.cache/lxqt/ \
+       ~/.config/openbox/
+```
+
+#### Carpetas comunes a todos los escritorios
+
+Estas también pueden guardar restos de cualquier entorno gráfico:
+
+```bash
+rm -rf ~/.config/autostart/ \
+       ~/.local/share/applications/ \
+       ~/.local/share/recently-used.xbel \
+       ~/.cache/thumbnails/
+```
+
+---
+
 ### 13.3 Personalización (Windows 11 style)
 
 Esto será para otra conversación, pero los pasos base:
