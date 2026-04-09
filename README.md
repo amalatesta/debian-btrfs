@@ -2956,6 +2956,86 @@ ls /mnt/backup/snapshots
 sudo umount /mnt/backup
 ```
 
+### 13.2.1 Limpiar configuraciones de usuario antes de instalar (o reinstalar) escritorio
+
+> **⚠️ Hacer esto si venís de un rollback a pre-escritorio o si querés una instalación limpia.**
+>
+> Cuando hacés rollback, los **paquetes** vuelven atrás, pero las **configuraciones de usuario
+> en `/home`** sobreviven: `@home` es un subvolumen separado que no forma parte del snapshot
+> de root. Restos de una instalación anterior pueden causar paneles mal configurados, temas
+> rotos o comportamientos inesperados al instalar el escritorio nuevo.
+
+#### ¿Por qué no borrar todo `~/.config`?
+
+`~/.config` también contiene configuración de herramientas no gráficas (git, vim, htop, etc.).
+Borrarlo todo se llevaría esas configuraciones también.
+
+#### Comando inteligente: detectar qué hay de escritorios en `~/.config`
+
+Antes de borrar, listá qué carpetas de escritorios existen:
+
+```bash
+ls ~/.config | grep -Ei \
+  'kde|plasma|kwin|kscreen|gnome|dconf|xfce|lxqt|openbox|sddm|lightdm|gdm'
+```
+
+Y lo mismo en `~/.local/share` y `~/.cache`:
+
+```bash
+ls ~/.local/share | grep -Ei 'kde|plasma|kwin|gnome|xfce|lxqt'
+ls ~/.cache       | grep -Ei 'kde|plasma|kwin|gnome|xfce|lxqt|ksycoca'
+```
+
+#### Limpieza por escritorio
+
+Ejecutar solo el bloque del escritorio que tenías instalado antes del rollback:
+
+**KDE Plasma:**
+
+```bash
+rm -rf ~/.config/kde* ~/.config/KDE* \
+       ~/.config/plasma* ~/.config/Plasma* \
+       ~/.config/kwin* ~/.config/kscreen* \
+       ~/.config/kdedefaults \
+       ~/.local/share/plasma* ~/.local/share/kded* ~/.local/share/kwin* \
+       ~/.cache/plasma* ~/.cache/kwin* ~/.cache/ksycoca*
+sudo rm -rf /etc/sddm.conf /etc/sddm.conf.d/
+```
+
+**GNOME:**
+
+```bash
+rm -rf ~/.config/gnome-* ~/.config/dconf \
+       ~/.local/share/gnome-* \
+       ~/.cache/gnome-*
+sudo rm -rf /etc/gdm3/
+```
+
+**XFCE:**
+
+```bash
+rm -rf ~/.config/xfce4/ ~/.cache/xfce4/ ~/.config/Thunar/
+sudo rm -rf /etc/lightdm/
+```
+
+**LXQt:**
+
+```bash
+rm -rf ~/.config/lxqt/ ~/.cache/lxqt/ ~/.config/openbox/
+sudo rm -rf /etc/lightdm/
+```
+
+#### Carpetas comunes (limpiar siempre, independiente del escritorio)
+
+```bash
+rm -rf ~/.config/autostart/ \
+       ~/.local/share/applications/ \
+       ~/.local/share/recently-used.xbel \
+       ~/.cache/thumbnails/
+```
+
+---
+
 **Para KDE Plasma mínimo:**
 
 ```bash
@@ -2973,89 +3053,6 @@ sudo reboot
 
 # DESPUÉS de verificar que funciona
 sudo snapper -c root create -d "KDE Plasma instalado y funcionando"
-```
-
-### 13.2.1 Limpiar configuraciones de usuario al volver a pre-escritorio
-
-Cuando hacés rollback a un snapshot pre-escritorio, los **paquetes** vuelven atrás pero las
-**configuraciones de usuario en `/home`** sobreviven porque `@home` es un subvolumen separado
-que no entra en el snapshot de root.
-
-Esto puede causar que al reinstalar el escritorio encuentres comportamientos raros
-(paneles mal configurados, temas rotos, etc.) heredados de la instalación anterior.
-
-**Solución: limpiar las carpetas del escritorio anterior antes de reinstalar.**
-
-> ⚠️ Estos comandos borran configuración de usuario. Hacerlos cuando estés seguro de que
-> no necesitás nada de la instalación anterior del escritorio.
-
-#### KDE Plasma
-
-```bash
-rm -rf ~/.config/kde* ~/.config/KDE* \
-       ~/.config/plasma* ~/.config/Plasma* \
-       ~/.config/kwin* ~/.config/kscreen* \
-       ~/.config/kdedefaults \
-       ~/.local/share/plasma* \
-       ~/.local/share/kded* \
-       ~/.local/share/kwin* \
-       ~/.cache/plasma* \
-       ~/.cache/kwin* \
-       ~/.cache/ksycoca*
-```
-
-Display manager SDDM (configuración del sistema, no de usuario):
-
-```bash
-sudo rm -rf /etc/sddm.conf /etc/sddm.conf.d/
-```
-
-#### GNOME
-
-```bash
-rm -rf ~/.config/gnome-* \
-       ~/.config/dconf \
-       ~/.local/share/gnome-* \
-       ~/.cache/gnome-*
-```
-
-Display manager GDM:
-
-```bash
-sudo rm -rf /etc/gdm3/
-```
-
-#### XFCE
-
-```bash
-rm -rf ~/.config/xfce4/ \
-       ~/.cache/xfce4/ \
-       ~/.config/Thunar/
-```
-
-Display manager LightDM:
-
-```bash
-sudo rm -rf /etc/lightdm/
-```
-
-#### LXQt
-
-```bash
-rm -rf ~/.config/lxqt/ \
-       ~/.cache/lxqt/ \
-       ~/.config/openbox/
-```
-
-#### Carpetas comunes a todos los escritorios
-
-Estas también pueden guardar restos de cualquier entorno gráfico:
-
-```bash
-rm -rf ~/.config/autostart/ \
-       ~/.local/share/applications/ \
-       ~/.local/share/recently-used.xbel \
-       ~/.cache/thumbnails/
 ```
 
 ---
