@@ -2935,19 +2935,25 @@ UUID=4e10e56c-665e-4b5c-9892-55bb12509de6 /mnt/btrfs-root btrfs subvolid=5,auto,
 > un estado limpio sin escritorio. Para asegurarte de poder volver a ese punto:
 
 ```bash
-# 1. Crear snapshot local "sin escritorio"
+# 1. Crear snapshot local "sin escritorio" — SIN algoritmo de limpieza
+#    ⚠️ NO agregar -c number: así Snapper NUNCA lo elimina automáticamente
 sudo snapper -c root create -d "Sistema base sin entorno gráfico"
 
-# 2. Replicarlo inmediatamente a la partición de recuperación (nvme0n1p3)
+# 2. Verificar que quedó SIN cleanup (columna Limpieza vacía = permanente)
+sudo snapper -c root list | tail -n 5
+#    Columna Limpieza debe estar vacía para este snapshot
+
+# Si por error quedó con cleanup, quitárselo manualmente:
+#   sudo snapper -c root modify --cleanup-algorithm "" <ID>
+
+# 3. Replicarlo inmediatamente a la partición de recuperación (nvme0n1p3)
+#    Esto lo guarda en un segundo lugar, independiente de Snapper
 sudo btrbk run
 
-# 3. Verificar que quedó en el backup
+# 4. Verificar que quedó en el backup
 sudo mount /mnt/backup
 ls /mnt/backup/snapshots
 sudo umount /mnt/backup
-
-# 4. Anotar el ID del snapshot local para referencia futura
-sudo snapper -c root list | tail -n 5
 ```
 
 **Para KDE Plasma mínimo:**
