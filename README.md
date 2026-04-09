@@ -572,9 +572,42 @@ Presionar Enter en mensaje informativo
 
 **Nota:** En Rescue Mode normalmente ya estás como `root` (prompt `#`), por lo que los comandos se ejecutan **sin** `sudo`.
 
+### 3.3.1 Preparar script de renombrado ANTES de reinstalar
+
+> **⚠️ Hacer esto con el sistema todavía funcionando, antes de reinstalar Debian.**
+
+El script `btrfs-rename-subvols.sh` automatiza el renombrado de `@rootfs → @`, la creación de `@home` y el movimiento del contenido. Para tenerlo disponible en Rescue Mode (donde no hay acceso a Internet ni al sistema instalado), copiarlo a la partición EFI:
+
+```bash
+# Con el sistema funcionando, ANTES de reinstalar:
+sudo cp /ruta/a/btrfs-rename-subvols.sh /boot/efi/
+
+# O descargar desde GitHub si tenés internet ahora:
+wget -O /boot/efi/btrfs-rename-subvols.sh \
+  https://raw.githubusercontent.com/amalatesta/debian-btrfs/main/scripts/btrfs-rename-subvols.sh
+```
+
+En Rescue Mode, después de instalar Debian:
+
+```bash
+# Montar la partición EFI
+mkdir -p /mnt/efi
+mount /dev/nvme0n1p1 /mnt/efi    # o /dev/sda1 para SATA
+
+# Ejecutar el script (reemplaza todos los pasos manuales de la sección 3.4)
+bash /mnt/efi/btrfs-rename-subvols.sh /dev/nvme0n1p2   # NVMe
+# bash /mnt/efi/btrfs-rename-subvols.sh /dev/sda2       # SATA
+```
+
+Si el script se ejecutó correctamente, podés **saltar directamente a la sección 3.6** (actualizar fstab).
+
+---
+
 ### 3.4 Renombrar a estructura estándar y crear @home
 
-**Comandos a ejecutar:**
+> Si ya ejecutaste el script de la sección 3.3.1, podés saltear esta sección y continuar en 3.5.
+
+**Comandos manuales (alternativa al script):**
 
 ```bash
 # Crear punto de montaje
@@ -2895,6 +2928,27 @@ UUID=4e10e56c-665e-4b5c-9892-55bb12509de6 /mnt/btrfs-root btrfs subvolid=5,auto,
 (sin `noauto` para que btrbk.timer funcione automáticamente en cada arranque)
 
 ### 13.2 Instalar entorno de escritorio
+
+> **⚠️ IMPORTANTE: Preservar snapshot base ANTES de instalar KDE**
+>
+> Una vez que instalás el entorno gráfico, los snapshots anteriores de Snapper pueden no reflejar
+> un estado limpio sin escritorio. Para asegurarte de poder volver a ese punto:
+
+```bash
+# 1. Crear snapshot local "sin escritorio"
+sudo snapper -c root create -d "Sistema base sin entorno gráfico"
+
+# 2. Replicarlo inmediatamente a la partición de recuperación (nvme0n1p3)
+sudo btrbk run
+
+# 3. Verificar que quedó en el backup
+sudo mount /mnt/backup
+ls /mnt/backup/snapshots
+sudo umount /mnt/backup
+
+# 4. Anotar el ID del snapshot local para referencia futura
+sudo snapper -c root list | tail -n 5
+```
 
 **Para KDE Plasma mínimo:**
 
