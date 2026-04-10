@@ -582,7 +582,7 @@ detect_disks() {
         
         if lsblk -n "${disks[$i]}" | grep -q part; then
             echo "    ⚠️  Contiene particiones:"
-            lsblk -ln -o NAME,SIZE,FSTYPE,LABEL,TYPE "${disks[$i]}" | awk '$5=="part"{printf "    %s %s %s %s\n",$1,$2,$3,$4}'
+            lsblk -ln -o NAME,SIZE,FSTYPE,LABEL,TYPE "${disks[$i]}" 2>/dev/null | awk '$5=="part"{printf "    %s %s %s %s\n",$1,$2,$3,$4}' || warning "No se pudieron listar las particiones de ${disks[$i]}"
         fi
     done
     echo ""
