@@ -1301,8 +1301,8 @@ install_kernel_grub() {
         chroot /mnt apt install -y firmware-linux firmware-linux-nonfree || true
     fi
     chroot /mnt apt install -y grub-efi-amd64 efibootmgr
-    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --no-nvram || \
-        chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --removable
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --no-nvram
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --removable
     chroot /mnt apt install -y btrfs-progs
     
     if chroot /mnt apt-cache show grub-btrfs &>/dev/null; then
