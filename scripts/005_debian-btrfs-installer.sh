@@ -1202,8 +1202,9 @@ create_user() {
     
     cp /etc/resolv.conf /mnt/etc/
     
+    chroot /mnt apt update
+    chroot /mnt apt install -y locales sudo
     chroot /mnt locale-gen
-    chroot /mnt apt install -y sudo
     if [[ "$ENABLE_POPCON" == "S" ]]; then
         chroot /mnt apt install -y popularity-contest || true
     fi
