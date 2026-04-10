@@ -582,7 +582,7 @@ detect_disks() {
         
         if lsblk -n "${disks[$i]}" | grep -q part; then
             echo "    ⚠️  Contiene particiones:"
-            lsblk -no NAME,SIZE,FSTYPE,LABEL "${disks[$i]}" | grep part | sed 's/^/    /'
+            lsblk -ln -o NAME,SIZE,FSTYPE,LABEL,TYPE "${disks[$i]}" | awk '$5=="part"{printf "    %s %s %s %s\n",$1,$2,$3,$4}'
         fi
     done
     echo ""
@@ -591,7 +591,29 @@ detect_disks() {
     while true; do
         read -p "Selecciona disco [1-${#disks[@]}]: " selection
         if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 1 ]] && [[ $selection -le ${#disks[@]} ]]; then
-            DISK="${disks[$((selection - 1))]}"
+            local candidate_disk="${disks[$((selection - 1))]}"
+
+            if lsblk -n "$candidate_disk" | grep -q part; then
+                echo ""
+                warning "El disco $candidate_disk ya contiene particiones y serán ELIMINADAS."
+                local wipe_confirm=""
+                while true; do
+                    read -p "¿Continuar con este disco? [s/N]: " wipe_confirm
+                    wipe_confirm="${wipe_confirm:-N}"
+                    wipe_confirm="$(normalize_yes_no "$wipe_confirm")"
+                    if [[ -n "$wipe_confirm" ]]; then
+                        break
+                    fi
+                    echo "Respuesta inválida. Usa S o N"
+                done
+
+                if [[ "$wipe_confirm" != "S" ]]; then
+                    echo "Seleccioná otro disco."
+                    continue
+                fi
+            fi
+
+            DISK="$candidate_disk"
             break
         fi
         echo "Selección inválida"
