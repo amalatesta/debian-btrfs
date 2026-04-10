@@ -477,10 +477,16 @@ analyze_locale_timezone() {
     if [[ -z "$SUGGESTED_TIMEZONE" ]]; then
         SUGGESTED_TIMEZONE="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
     fi
-    [[ -z "$SUGGESTED_TIMEZONE" ]] && SUGGESTED_TIMEZONE="UTC"
+    if [[ -z "$SUGGESTED_TIMEZONE" ]]; then
+        SUGGESTED_TIMEZONE="UTC"
+    fi
 
     SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2}')"
-    [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
+    if [[ -z "$SUGGESTED_LOCALE" ]]; then
+        SUGGESTED_LOCALE="en_US.UTF-8"
+    fi
+
+    return 0
 }
 
 trap 'handle_error $LINENO' ERR
