@@ -386,6 +386,7 @@ BTRFS_OPTS="defaults,noatime,space_cache=v2,compress=zstd:1"
 # Estado de montaje para limpieza segura
 MOUNTED_TARGET="false"
 MOUNTED_CHROOT_BIND="false"
+GRUB_BTRFS_INSTALLED="N"
 
 # ============================================
 # FUNCIONES DE UTILIDAD
@@ -1026,7 +1027,11 @@ show_configuration_summary() {
     
     echo "═══ SOFTWARE ═══"
     echo "  ✓ Debian minimal + kernel"
-    echo "  ✓ GRUB + grub-btrfs"
+    if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
+        echo "  ✓ GRUB + grub-btrfs"
+    else
+        echo "  ✓ GRUB (grub-btrfs no disponible en repos actuales)"
+    fi
     echo "  ✓ btrfs-progs"
     echo "  Modo software: $SOFTWARE_INSTALL_MODE"
     if [[ "$INSTALL_SSH_IN_BASE" == "S" ]]; then
@@ -1264,6 +1269,8 @@ create_user() {
     mount -t sysfs /sys /mnt/sys
     mount --rbind /dev /mnt/dev
     mount --rbind /run /mnt/run
+    mkdir -p /mnt/dev/pts
+    mount -t devpts devpts /mnt/dev/pts &>/dev/null || true
     MOUNTED_CHROOT_BIND="true"
     
     cp /etc/resolv.conf /mnt/etc/
@@ -1294,19 +1301,29 @@ install_kernel_grub() {
         chroot /mnt apt install -y firmware-linux firmware-linux-nonfree || true
     fi
     chroot /mnt apt install -y grub-efi-amd64 efibootmgr
-    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --no-nvram || \
+        chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=DEBIAN --removable
     chroot /mnt apt install -y btrfs-progs
-    chroot /mnt apt install -y grub-btrfs
     
-    mkdir -p /mnt/etc/default/grub-btrfs
-    cat > /mnt/etc/default/grub-btrfs/config << 'EOF'
+    if chroot /mnt apt-cache show grub-btrfs &>/dev/null; then
+        chroot /mnt apt install -y grub-btrfs
+        GRUB_BTRFS_INSTALLED="S"
+    else
+        warning "Paquete grub-btrfs no disponible en los repositorios actuales; se omite su instalación"
+        GRUB_BTRFS_INSTALLED="N"
+    fi
+
+    if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
+        mkdir -p /mnt/etc/default/grub-btrfs
+        cat > /mnt/etc/default/grub-btrfs/config << 'EOF'
 GRUB_BTRFS_SUBMENUNAME="Debian Snapshots"
 GRUB_BTRFS_LIMIT="10"
 GRUB_BTRFS_SHOW_SNAPSHOTS_FOUND="true"
 GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS="systemd.volatile=state"
 EOF
-    
-    chroot /mnt systemctl enable grub-btrfsd.service || true
+
+        chroot /mnt systemctl enable grub-btrfsd.service || true
+    fi
     chroot /mnt update-grub
     
     success "Kernel y GRUB instalados"
@@ -1466,7 +1483,12 @@ show_final_summary() {
     echo ""
     
     echo "═══ SOFTWARE ═══"
-    echo "  ✓ Kernel + GRUB + grub-btrfs"
+    if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
+        echo "  ✓ Kernel + GRUB + grub-btrfs"
+    else
+        echo "  ✓ Kernel + GRUB"
+        echo "  ⚠ grub-btrfs no se instaló (no disponible en repos actuales)"
+    fi
     if chroot /mnt dpkg -l 2>/dev/null | grep -q "^ii.*openssh-server"; then
         echo "  ✓ SSH server (puerto 22)"
         echo "    ssh $USERNAME@<IP>"
