@@ -1416,8 +1416,19 @@ DHCP=yes
 EOF
     
     chroot /mnt systemctl enable systemd-networkd
-    chroot /mnt systemctl enable systemd-resolved
-    ln -sf /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
+
+    # En algunas instalaciones mínimas systemd-resolved no viene instalado
+    chroot /mnt apt install -y systemd-resolved &>/dev/null || true
+    if chroot /mnt systemctl list-unit-files 2>/dev/null | grep -q '^systemd-resolved\.service'; then
+        chroot /mnt systemctl enable systemd-resolved
+        ln -sf /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
+    else
+        warning "systemd-resolved no disponible; se deja resolv.conf estático"
+        cat > /mnt/etc/resolv.conf << 'EOF'
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+    fi
     
     success "Red configurada (DHCP)"
 }
