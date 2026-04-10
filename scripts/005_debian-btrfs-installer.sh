@@ -440,6 +440,28 @@ unmount_disk_partitions() {
     return 0
 }
 
+ensure_partition_unmounted() {
+    local part="$1"
+    local tries=0
+
+    while [[ $tries -lt 5 ]]; do
+        if ! findmnt -rn -S "$part" &>/dev/null; then
+            return 0
+        fi
+
+        while IFS= read -r mnt; do
+            [[ -z "$mnt" ]] && continue
+            umount "$mnt" &>/dev/null || umount -l "$mnt" &>/dev/null || true
+        done < <(findmnt -rn -S "$part" -o TARGET)
+
+        command -v udevadm &>/dev/null && udevadm settle || true
+        sleep 1
+        tries=$((tries + 1))
+    done
+
+    error "No se pudo desmontar $part. Cierra el explorador de archivos del Live e intenta de nuevo."
+}
+
 handle_error() {
     local line="$1"
     echo "❌ ERROR inesperado en línea ${line}. Revisa el log: $LOG_FILE" | tee -a "$LOG_FILE" >&2
@@ -1072,9 +1094,11 @@ format_partitions() {
     log "Formateando particiones..."
 
     unmount_disk_partitions
-    umount "$EFI_PART" &>/dev/null || true
-    umount "$SYSTEM_PART" &>/dev/null || true
-    umount "$BACKUP_PART" &>/dev/null || true
+    ensure_partition_unmounted "$EFI_PART"
+    ensure_partition_unmounted "$SYSTEM_PART"
+    if [[ "$CREATE_BACKUP" == "S" ]]; then
+        ensure_partition_unmounted "$BACKUP_PART"
+    fi
     
     mkfs.fat -F32 -n EFI "$EFI_PART" || error "Error formateando EFI"
     mkfs.btrfs -f -L DEBIAN "$SYSTEM_PART" || error "Error formateando Sistema"
