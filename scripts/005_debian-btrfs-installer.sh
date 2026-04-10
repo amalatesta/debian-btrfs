@@ -427,6 +427,19 @@ cleanup_mounts() {
     fi
 }
 
+unmount_disk_partitions() {
+    [[ -z "$DISK" ]] && return 0
+
+    while IFS= read -r part; do
+        [[ -z "$part" ]] && continue
+        swapoff "$part" &>/dev/null || true
+        umount "$part" &>/dev/null || true
+    done < <(lsblk -ln -o NAME,TYPE "$DISK" 2>/dev/null | awk '$2=="part"{print "/dev/"$1}')
+
+    command -v udevadm &>/dev/null && udevadm settle || true
+    return 0
+}
+
 handle_error() {
     local line="$1"
     echo "❌ ERROR inesperado en línea ${line}. Revisa el log: $LOG_FILE" | tee -a "$LOG_FILE" >&2
@@ -1027,6 +1040,8 @@ show_configuration_summary() {
 
 partition_disk() {
     log "Particionando $DISK..."
+
+    unmount_disk_partitions
     
     if [[ "$DISK" =~ nvme ]]; then
         local P="p"
@@ -1055,6 +1070,11 @@ partition_disk() {
 
 format_partitions() {
     log "Formateando particiones..."
+
+    unmount_disk_partitions
+    umount "$EFI_PART" &>/dev/null || true
+    umount "$SYSTEM_PART" &>/dev/null || true
+    umount "$BACKUP_PART" &>/dev/null || true
     
     mkfs.fat -F32 -n EFI "$EFI_PART" || error "Error formateando EFI"
     mkfs.btrfs -f -L DEBIAN "$SYSTEM_PART" || error "Error formateando Sistema"
