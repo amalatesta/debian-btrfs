@@ -1309,8 +1309,14 @@ install_kernel_grub() {
         chroot /mnt apt install -y grub-btrfs
         GRUB_BTRFS_INSTALLED="S"
     else
-        warning "Paquete grub-btrfs no disponible en los repositorios actuales; se omite su instalación"
-        GRUB_BTRFS_INSTALLED="N"
+        warning "Paquete grub-btrfs no disponible en repos; intentando instalación desde GitHub"
+        chroot /mnt apt install -y git make
+        if chroot /mnt bash -lc 'set -e; tmpdir=$(mktemp -d); cd "$tmpdir"; git clone https://github.com/Antynea/grub-btrfs.git; cd grub-btrfs; make install; cd /; rm -rf "$tmpdir"'; then
+            GRUB_BTRFS_INSTALLED="S"
+        else
+            warning "No se pudo instalar grub-btrfs desde GitHub"
+            GRUB_BTRFS_INSTALLED="N"
+        fi
     fi
 
     if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
