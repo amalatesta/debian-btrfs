@@ -469,7 +469,7 @@ ask_input() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" --output-fd 1)" || return 1
+        answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         read -r -p "$prompt [$default_value]: " answer </dev/tty
@@ -483,7 +483,7 @@ ask_password() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 --output-fd 1)" || return 1
+        answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         read -r -s -p "$prompt: " answer </dev/tty
@@ -529,7 +529,7 @@ ask_menu() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        answer="$(whiptail --title "$title" --menu "$prompt" 18 90 10 --default-item "$default_value" "$@" --output-fd 1)" || return 1
+        answer="$(whiptail --title "$title" --menu "$prompt" 18 90 10 --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         local i=1
