@@ -475,6 +475,18 @@ ui_textbox_from_text() {
     fi
 }
 
+ui_continue_or_back() {
+    local title="$1"
+    local message="$2"
+
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        whiptail --title "$title" --yes-button "Seguir" --no-button "Volver" --yesno "$message" 12 78
+        return $?
+    fi
+
+    return 0
+}
+
 setup_ui() {
     case "$UI_MODE" in
         TEXT)
@@ -1441,21 +1453,25 @@ interactive_config() {
     local config_valid=false
     
     while [[ "$config_valid" == false ]]; do
-        separator
-        echo "CONFIGURACIÓN DEL SISTEMA"
-        separator
-        echo ""
-        echo "Disco seleccionado: $DISK"
-        echo "  Capacidad: ${DISK_SIZE_GB}GB"
-        echo "  Modelo: $(lsblk -ndo MODEL "$DISK" 2>/dev/null | xargs)"
-        echo ""
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            separator
+            echo "CONFIGURACIÓN DEL SISTEMA"
+            separator
+            echo ""
+            echo "Disco seleccionado: $DISK"
+            echo "  Capacidad: ${DISK_SIZE_GB}GB"
+            echo "  Modelo: $(lsblk -ndo MODEL "$DISK" 2>/dev/null | xargs)"
+            echo ""
+        fi
         
         # PARTICIONES
-        separator
-        echo "CONFIGURACIÓN DE PARTICIONES"
-        separator
-        echo ""
-        echo "Partición EFI (bootloader):"
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            separator
+            echo "CONFIGURACIÓN DE PARTICIONES"
+            separator
+            echo ""
+            echo "Partición EFI (bootloader):"
+        fi
         while true; do
             EFI_SIZE="$(ask_input "Particion EFI" "Tamaño de EFI (ej: 1G)" "$SUGGESTED_EFI")" || error "Configuracion cancelada"
             if is_valid_size_gib "$EFI_SIZE"; then
@@ -1464,9 +1480,11 @@ interactive_config() {
             ui_warn "Tamaño EFI invalido. Usa formato entero en GiB, por ejemplo: 1G"
         done
         
-        echo ""
-        echo "Partición Sistema (btrfs - sistema operativo):"
-        echo "  Sugerencia: ${SUGGESTED_SYSTEM_GB}GB (${SUGGESTED_SYSTEM_PCT}% del disco)"
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+            echo "Partición Sistema (btrfs - sistema operativo):"
+            echo "  Sugerencia: ${SUGGESTED_SYSTEM_GB}GB (${SUGGESTED_SYSTEM_PCT}% del disco)"
+        fi
         while true; do
             SYSTEM_SIZE="$(ask_input "Particion Sistema" "Tamaño de sistema (ej: 80G)" "${SUGGESTED_SYSTEM_GB}G")" || error "Configuracion cancelada"
             if ! is_valid_size_gib "$SYSTEM_SIZE"; then
@@ -1488,10 +1506,16 @@ interactive_config() {
 
         local backup_size_calc=$((DISK_SIZE_GB - SYSTEM_SIZE_NUM - 1))
         
-        echo ""
-        echo "Partición Backup (btrfs - snapshots aislados):"
-        echo "  Espacio restante: ${backup_size_calc}GB"
-        echo "  Nota: Esta partición estará normalmente desmontada (seguridad)"
+        if [[ "$USE_WHIPTAIL" == "S" ]]; then
+            if ! ui_continue_or_back "Particion Backup" "Espacio restante: ${backup_size_calc}GB\n\nEsta particion estara normalmente desmontada por seguridad.\n\nDeseas seguir?"; then
+                continue
+            fi
+        else
+            echo ""
+            echo "Partición Backup (btrfs - snapshots aislados):"
+            echo "  Espacio restante: ${backup_size_calc}GB"
+            echo "  Nota: Esta partición estará normalmente desmontada (seguridad)"
+        fi
         while true; do
             CREATE_BACKUP="$(ask_yes_no "Particion Backup" "Crear particion backup?" "S")"
             if [[ -n "$CREATE_BACKUP" ]]; then
@@ -1501,13 +1525,19 @@ interactive_config() {
         done
         
         # SWAP
-        echo ""
-        separator
-        echo "CONFIGURACIÓN DE SWAP"
-        separator
-        echo "  RAM detectada: ${RAM_GB}GB"
-        echo "  Sugerencia: $SUGGESTED_SWAP ($SWAP_REASON)"
-        echo ""
+        if [[ "$USE_WHIPTAIL" == "S" ]]; then
+            if ! ui_continue_or_back "Configuracion de Swap" "RAM detectada: ${RAM_GB}GB\nSugerencia: $SUGGESTED_SWAP ($SWAP_REASON)\n\nDeseas seguir?"; then
+                continue
+            fi
+        else
+            echo ""
+            separator
+            echo "CONFIGURACIÓN DE SWAP"
+            separator
+            echo "  RAM detectada: ${RAM_GB}GB"
+            echo "  Sugerencia: $SUGGESTED_SWAP ($SWAP_REASON)"
+            echo ""
+        fi
         while true; do
             SWAP_SIZE="$(ask_input "Swap" "Tamaño de swap (ej: 8G)" "$SUGGESTED_SWAP")" || error "Configuracion cancelada"
             if is_valid_size_gib "$SWAP_SIZE"; then
@@ -1517,11 +1547,13 @@ interactive_config() {
         done
         
         # SISTEMA
-        echo ""
-        separator
-        echo "CONFIGURACIÓN DEL SISTEMA"
-        separator
-        echo ""
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+            separator
+            echo "CONFIGURACIÓN DEL SISTEMA"
+            separator
+            echo ""
+        fi
         HOSTNAME="$(ask_input "Sistema" "Hostname" "$SUGGESTED_HOSTNAME")" || error "Configuracion cancelada"
         
         USERNAME="$(ask_input "Sistema" "Nombre de usuario" "usuario")" || error "Configuracion cancelada"
@@ -1540,18 +1572,22 @@ interactive_config() {
         done
         
         # REGIONAL
-        echo ""
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+        fi
         TIMEZONE="$(ask_input "Regional" "Zona horaria" "$SUGGESTED_TIMEZONE")" || error "Configuracion cancelada"
         
         LOCALE="$(ask_input "Regional" "Locale" "$SUGGESTED_LOCALE")" || error "Configuracion cancelada"
 
         # PREGUNTAS NO CRÍTICAS (ESTILO INSTALADOR DEBIAN)
-        echo ""
-        separator
-        echo "PREGUNTAS NO CRÍTICAS"
-        separator
-        echo "Si presionas ENTER, se usa la sugerencia."
-        echo ""
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+            separator
+            echo "PREGUNTAS NO CRÍTICAS"
+            separator
+            echo "Si presionas ENTER, se usa la sugerencia."
+            echo ""
+        fi
 
         while true; do
             APT_ENABLE_NONFREE="$(ask_yes_no "Repositorios" "Habilitar software no libre (contrib/non-free/non-free-firmware)?" "S")"
@@ -1591,11 +1627,13 @@ interactive_config() {
             ui_warn "Respuesta invalida"
         done
 
-        echo ""
-        echo "Modo de software base:"
-        echo "  [1] AUTO        -> instala standard (+SSH opcional)"
-        echo "  [2] INTERACTIVE -> abre tasksel para elegir"
-        echo "  [3] POSTBOOT    -> deja software para después del primer arranque"
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+            echo "Modo de software base:"
+            echo "  [1] AUTO        -> instala standard (+SSH opcional)"
+            echo "  [2] INTERACTIVE -> abre tasksel para elegir"
+            echo "  [3] POSTBOOT    -> deja software para después del primer arranque"
+        fi
         while true; do
             SOFTWARE_INSTALL_MODE="$(ask_menu "Software Base" "Selecciona modo" "3" \
                 "1" "AUTO - instala standard (+SSH opcional)" \
@@ -1622,12 +1660,14 @@ interactive_config() {
         show_configuration_summary
         
         # OPCIONES
-        echo ""
-        echo "Opciones:"
-        echo "  [C] Confirmar y continuar con la instalación"
-        echo "  [M] Modificar configuración"
-        echo "  [S] Salir sin instalar"
-        echo ""
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo ""
+            echo "Opciones:"
+            echo "  [C] Confirmar y continuar con la instalación"
+            echo "  [M] Modificar configuración"
+            echo "  [S] Salir sin instalar"
+            echo ""
+        fi
         choice="$(ask_menu "Confirmacion" "Selecciona una opcion" "C" \
             "C" "Confirmar y continuar con la instalacion" \
             "M" "Modificar configuracion" \
