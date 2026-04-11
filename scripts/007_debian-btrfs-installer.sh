@@ -480,7 +480,7 @@ setup_ui() {
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         # Tema de colores mas uniforme para evitar contraste azul intenso en listas.
-        export NEWT_COLORS='root=black,blue window=black,lightgray border=black,lightgray shadow=black,black title=red,lightgray textbox=black,lightgray entry=black,white label=black,lightgray button=black,lightgray actbutton=white,red compactbutton=black,lightgray listbox=black,lightgray actlistbox=black,lightgray sellistbox=black,lightgray actsellistbox=white,red checkbox=black,lightgray actcheckbox=white,red helpline=black,lightgray'
+        export NEWT_COLORS='root=black,blue window=black,lightgray border=black,lightgray shadow=black,black title=red,lightgray textbox=black,lightgray entry=black,white label=black,lightgray button=black,lightgray actbutton=white,red compactbutton=black,lightgray listbox=black,lightgray actlistbox=black,lightgray sellistbox=black,lightgray actsellistbox=white,blue checkbox=black,lightgray actcheckbox=white,red helpline=black,lightgray'
         log "UI: whiptail"
     else
         log "UI: texto plano"
@@ -563,27 +563,9 @@ ask_menu() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        local radio_args=()
-        local i=1
         local term_cols term_lines
         local win_w win_h menu_h
-        local option_count
-
-        while [[ $i -le $# ]]; do
-            local key="${!i}"
-            i=$((i + 1))
-            local desc="${!i}"
-            i=$((i + 1))
-
-            local status="OFF"
-            if [[ "$key" == "$default_value" ]]; then
-                status="ON"
-            fi
-
-            radio_args+=("$key" "      $desc" "$status")
-        done
-
-        option_count=$(( ${#radio_args[@]} / 3 ))
+        local option_count=$(( $# / 2 ))
         term_cols="$(tput cols 2>/dev/null || echo 120)"
         term_lines="$(tput lines 2>/dev/null || echo 40)"
 
@@ -602,7 +584,7 @@ ask_menu() {
         (( menu_h < 4 )) && menu_h=4
         (( menu_h > option_count )) && menu_h=$option_count
 
-        answer="$(whiptail --title "$title" --radiolist "$prompt" "$win_h" "$win_w" "$menu_h" "${radio_args[@]}" 3>&1 1>&2 2>&3)" || return 1
+        answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         local i=1
