@@ -529,7 +529,24 @@ ask_menu() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        answer="$(whiptail --title "$title" --menu "$prompt" 18 90 10 --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
+        local radio_args=()
+        local i=1
+
+        while [[ $i -le $# ]]; do
+            local key="${!i}"
+            i=$((i + 1))
+            local desc="${!i}"
+            i=$((i + 1))
+
+            local status="OFF"
+            if [[ "$key" == "$default_value" ]]; then
+                status="ON"
+            fi
+
+            radio_args+=("$key" "$desc" "$status")
+        done
+
+        answer="$(whiptail --title "$title" --radiolist "$prompt" 20 90 12 "${radio_args[@]}" 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         local i=1
