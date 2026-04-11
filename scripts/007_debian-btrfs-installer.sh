@@ -343,6 +343,7 @@ USE_WHIPTAIL="N"
 PROGRESS_WHIPTAIL_ACTIVE="N"
 PROGRESS_LAST_PCT=-1
 DRY_RUN_WHIPTAIL_NEXT="S"
+WIZARD_ACTION=""
 
 # Variables de configuración (se llenan interactivamente)
 DISK=""
@@ -635,6 +636,7 @@ EOF
 
 startup_wizard() {
     local action=""
+    WIZARD_ACTION=""
 
     while true; do
         if [[ "$USE_WHIPTAIL" == "S" ]]; then
@@ -646,7 +648,7 @@ startup_wizard() {
             "2" "Modo prueba (dry-run)" \
             "3" "Ayuda" \
             "4" "Salir")" || {
-            echo "EXIT"
+            WIZARD_ACTION="EXIT"
             return 0
         }
 
@@ -656,11 +658,11 @@ startup_wizard() {
 
         case "$action" in
             1)
-                echo "INSTALL"
+                WIZARD_ACTION="INSTALL"
                 return 0
                 ;;
             2)
-                echo "DRYRUN"
+                WIZARD_ACTION="DRYRUN"
                 return 0
                 ;;
             3)
@@ -675,7 +677,7 @@ startup_wizard() {
                 fi
                 ;;
             4)
-                echo "EXIT"
+                WIZARD_ACTION="EXIT"
                 return 0
                 ;;
             *)
@@ -2307,9 +2309,8 @@ main() {
     setup_ui
 
     if [[ "$DRY_RUN" != "S" ]]; then
-        local wizard_action=""
-        wizard_action="$(startup_wizard)"
-        case "$wizard_action" in
+        startup_wizard
+        case "$WIZARD_ACTION" in
             INSTALL)
                 ;;
             DRYRUN)
@@ -2321,7 +2322,7 @@ main() {
                 exit 0
                 ;;
             *)
-                error "Accion inicial invalida: $wizard_action"
+                error "Accion inicial invalida: $WIZARD_ACTION"
                 ;;
         esac
     fi
