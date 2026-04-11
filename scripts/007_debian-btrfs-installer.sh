@@ -574,6 +574,10 @@ startup_wizard() {
             return 0
         }
 
+        # En algunos entornos TTY/whiptail pueden aparecer CR/LF o espacios residuales.
+        # Normalizamos para que el case siempre reciba una opcion limpia (1-4).
+        action="$(printf '%s' "$action" | tr -d '\r\n' | xargs)"
+
         case "$action" in
             1)
                 echo "INSTALL"
