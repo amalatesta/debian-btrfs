@@ -2203,6 +2203,54 @@ cleanup() {
     success "Limpieza completada"
 }
 
+attempt_eject_install_media() {
+    log "Intentando expulsar medio de instalacion..."
+
+    if ! command -v eject &>/dev/null; then
+        warning "Comando 'eject' no disponible; omitiendo expulsion automatica"
+        return 0
+    fi
+
+    local devices=()
+    local dev
+    local ejected=false
+
+    if command -v lsblk &>/dev/null; then
+        while IFS= read -r dev; do
+            [[ -n "$dev" ]] && devices+=("$dev")
+        done < <(lsblk -pn -o NAME,TYPE 2>/dev/null | awk '$2=="rom"{print $1}')
+    fi
+
+    if [[ ${#devices[@]} -eq 0 ]] && [[ -b /dev/sr0 ]]; then
+        devices+=("/dev/sr0")
+    fi
+
+    if [[ ${#devices[@]} -eq 0 ]]; then
+        warning "No se detectaron dispositivos de tipo CD/DVD (rom)"
+        return 0
+    fi
+
+    for dev in "${devices[@]}"; do
+        if eject "$dev" &>/dev/null; then
+            success "Medio expulsado: $dev"
+            ejected=true
+            break
+        fi
+
+        if eject -s "$dev" &>/dev/null; then
+            success "Comando de expulsion enviado a: $dev"
+            ejected=true
+            break
+        fi
+    done
+
+    if [[ "$ejected" == false ]]; then
+        warning "No se pudo expulsar el medio automaticamente (comun en algunas VMs)"
+    fi
+
+    return 0
+}
+
 show_final_summary() {
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         local final_text
@@ -2363,6 +2411,12 @@ main() {
     run_installation_pipeline
     
     cleanup_mounts
+
+    attempt_eject_install_media
+
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        whiptail --title "Reinicio" --msgbox "Si el medio no se expulso automaticamente, retiralo desde la configuracion de la VM antes de reiniciar." 12 78
+    fi
     
     echo ""
     read -p "Presiona ENTER para reiniciar..." dummy
