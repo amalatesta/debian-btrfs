@@ -621,6 +621,10 @@ startup_wizard() {
     local action=""
 
     while true; do
+        if [[ "$USE_WHIPTAIL" == "S" ]]; then
+            clear
+        fi
+
         action="$(ask_menu "Debian Btrfs Installer" "Seleccione una opcion." "1" \
             "1" "Iniciar instalacion" \
             "2" "Modo prueba (dry-run)" \
@@ -646,6 +650,7 @@ startup_wizard() {
             3)
                 if [[ "$USE_WHIPTAIL" == "S" ]]; then
                     whiptail --title "Ayuda" --msgbox "$(show_usage)" 18 78
+                    clear
                 else
                     separator
                     show_usage
@@ -2295,6 +2300,7 @@ main() {
                 DRY_RUN="S"
                 ;;
             EXIT)
+                clear
                 echo "Instalador finalizado por el usuario"
                 exit 0
                 ;;
