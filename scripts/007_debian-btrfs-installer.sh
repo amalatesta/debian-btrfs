@@ -448,9 +448,25 @@ ui_textbox_from_text() {
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         local tmpfile
+        local term_cols term_lines
+        local win_w win_h
+
+        term_cols="$(tput cols 2>/dev/null || echo 120)"
+        term_lines="$(tput lines 2>/dev/null || echo 40)"
+
+        win_w=$(( term_cols * 75 / 100 ))
+        (( win_w < 60 )) && win_w=60
+        (( win_w > 96 )) && win_w=96
+        (( win_w > term_cols - 4 )) && win_w=$(( term_cols - 4 ))
+
+        win_h=$(( term_lines * 75 / 100 ))
+        (( win_h < 14 )) && win_h=14
+        (( win_h > 28 )) && win_h=28
+        (( win_h > term_lines - 2 )) && win_h=$(( term_lines - 2 ))
+
         tmpfile="$(mktemp)"
         printf "%s\n" "$text" > "$tmpfile"
-        whiptail --title "$title" --textbox "$tmpfile" 24 90
+        whiptail --title "$title" --textbox "$tmpfile" "$win_h" "$win_w"
         rm -f "$tmpfile"
     else
         echo "$text"
@@ -649,7 +665,7 @@ startup_wizard() {
                 ;;
             3)
                 if [[ "$USE_WHIPTAIL" == "S" ]]; then
-                    whiptail --title "Ayuda" --msgbox "$(show_usage)" 18 78
+                    ui_textbox_from_text "Ayuda" "$(show_usage)"
                     clear
                 else
                     separator
