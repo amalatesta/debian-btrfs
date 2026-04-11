@@ -343,6 +343,7 @@ USE_WHIPTAIL="N"
 PROGRESS_WHIPTAIL_ACTIVE="N"
 PROGRESS_LAST_PCT=-1
 DRY_RUN_WHIPTAIL_NEXT="S"
+DRY_RUN_RETURN_TO_MENU="N"
 WIZARD_ACTION=""
 
 # Variables de configuración (se llenan interactivamente)
@@ -1062,6 +1063,8 @@ show_dry_run_step() {
 }
 
 run_dry_run_preview() {
+    DRY_RUN_RETURN_TO_MENU="N"
+
     DISK="$(lsblk -ndpo NAME 2>/dev/null | head -n1 || true)"
     DISK="${DISK:-/dev/sdX}"
     DISK_SIZE_GB=512
@@ -1097,6 +1100,7 @@ run_dry_run_preview() {
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         if ! whiptail --title "Modo Prueba" --yes-button "Iniciar" --no-button "Volver" --yesno "Iniciar preview paso a paso?" 10 64; then
+            DRY_RUN_RETURN_TO_MENU="S"
             return 0
         fi
     else
@@ -2308,29 +2312,38 @@ main() {
     parse_args "$@"
     setup_ui
 
-    if [[ "$DRY_RUN" != "S" ]]; then
-        startup_wizard
-        case "$WIZARD_ACTION" in
-            INSTALL)
-                ;;
-            DRYRUN)
-                DRY_RUN="S"
-                ;;
-            EXIT)
-                clear
-                echo "Instalador finalizado por el usuario"
-                exit 0
-                ;;
-            *)
-                error "Accion inicial invalida: $WIZARD_ACTION"
-                ;;
-        esac
-    fi
+    while true; do
+        if [[ "$DRY_RUN" != "S" ]]; then
+            startup_wizard
+            case "$WIZARD_ACTION" in
+                INSTALL)
+                    break
+                    ;;
+                DRYRUN)
+                    DRY_RUN="S"
+                    ;;
+                EXIT)
+                    clear
+                    echo "Instalador finalizado por el usuario"
+                    exit 0
+                    ;;
+                *)
+                    error "Accion inicial invalida: $WIZARD_ACTION"
+                    ;;
+            esac
+        fi
 
-    if [[ "$DRY_RUN" == "S" ]]; then
-        run_dry_run_preview
-        exit 0
-    fi
+        if [[ "$DRY_RUN" == "S" ]]; then
+            run_dry_run_preview
+
+            if [[ "$DRY_RUN_RETURN_TO_MENU" == "S" ]]; then
+                DRY_RUN="N"
+                continue
+            fi
+
+            exit 0
+        fi
+    done
 
     clear
     separator
