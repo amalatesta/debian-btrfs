@@ -445,11 +445,9 @@ separator() {
 }
 
 ui_redraw_tty() {
-    # En algunas TTY de VM, whiptail deja cursor residual hasta el siguiente Enter.
-    # Forzamos redraw para encadenar dialogos sin interacción extra.
-    if [[ -t 1 ]]; then
-        clear >/dev/tty 2>/dev/null || true
-    fi
+    # No-op: en algunas VMs, limpiar la TTY entre dialogos produce pantalla negra
+    # intermedia y puede requerir Enter adicional para continuar.
+    return 0
 }
 
 ui_textbox_from_text() {
