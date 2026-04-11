@@ -444,11 +444,20 @@ separator() {
     fi
 }
 
+ui_redraw_tty() {
+    # En algunas TTY de VM, whiptail deja cursor residual hasta el siguiente Enter.
+    # Forzamos redraw para encadenar dialogos sin interacción extra.
+    if [[ -t 1 ]]; then
+        clear >/dev/tty 2>/dev/null || true
+    fi
+}
+
 ui_textbox_from_text() {
     local title="$1"
     local text="$2"
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         local tmpfile
         local term_cols term_lines
         local win_w win_h
@@ -470,6 +479,7 @@ ui_textbox_from_text() {
         printf "%s\n" "$text" > "$tmpfile"
         whiptail --title "$title" --textbox "$tmpfile" "$win_h" "$win_w"
         rm -f "$tmpfile"
+        ui_redraw_tty
     else
         echo "$text"
     fi
@@ -480,8 +490,11 @@ ui_continue_or_back() {
     local message="$2"
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         whiptail --title "$title" --yes-button "Seguir" --no-button "Volver" --yesno "$message" 12 78
-        return $?
+        local rc=$?
+        ui_redraw_tty
+        return $rc
     fi
 
     return 0
@@ -534,7 +547,9 @@ ask_input() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+        ui_redraw_tty
         echo "$answer"
     else
         read -r -p "$prompt [$default_value]: " answer </dev/tty
@@ -548,7 +563,9 @@ ask_password() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 3>&1 1>&2 2>&3)" || return 1
+        ui_redraw_tty
         echo "$answer"
     else
         read -r -s -p "$prompt: " answer </dev/tty
@@ -564,6 +581,7 @@ ask_yes_no() {
     local result=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         if [[ "$default_yes_no" == "N" ]]; then
             if whiptail --title "$title" --defaultno --yes-button "Si" --no-button "No" --yesno "$prompt" 12 78; then
                 result="S"
@@ -577,6 +595,7 @@ ask_yes_no() {
                 result="N"
             fi
         fi
+        ui_redraw_tty
         echo "$result"
     else
         read -r -p "$prompt [${default_yes_no}]: " result </dev/tty
@@ -594,6 +613,7 @@ ask_menu() {
     local answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        ui_redraw_tty
         local term_cols term_lines
         local win_w win_h menu_h
         local option_count=$(( $# / 2 ))
@@ -616,6 +636,7 @@ ask_menu() {
         (( menu_h > option_count )) && menu_h=$option_count
 
         answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
+        ui_redraw_tty
         echo "$answer"
     else
         local i=1
