@@ -478,6 +478,8 @@ setup_ui() {
     esac
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        # Tema de colores mas uniforme para evitar contraste azul intenso en listas.
+        export NEWT_COLORS='root=black,blue window=black,lightgray border=black,lightgray shadow=black,black title=red,lightgray textbox=black,lightgray entry=black,white label=black,lightgray button=black,lightgray actbutton=white,red compactbutton=black,lightgray listbox=black,lightgray actlistbox=black,lightgray sellistbox=black,lightgray actsellistbox=white,darkgray checkbox=black,lightgray actcheckbox=white,red helpline=black,lightgray'
         log "UI: whiptail"
     else
         log "UI: texto plano"
@@ -577,7 +579,7 @@ ask_menu() {
                 status="ON"
             fi
 
-            radio_args+=("$key" "$desc" "$status")
+            radio_args+=("$key" "  $desc" "$status")
         done
 
         option_count=$(( ${#radio_args[@]} / 3 ))
@@ -585,9 +587,9 @@ ask_menu() {
         term_lines="$(tput lines 2>/dev/null || echo 40)"
 
         # Dimensiones adaptativas para mantener una apariencia mas centrada en distintas consolas.
-        win_w=$(( term_cols * 70 / 100 ))
-        (( win_w < 64 )) && win_w=64
-        (( win_w > 90 )) && win_w=90
+        win_w=$(( term_cols * 58 / 100 ))
+        (( win_w < 56 )) && win_w=56
+        (( win_w > 76 )) && win_w=76
         (( win_w > term_cols - 4 )) && win_w=$(( term_cols - 4 ))
 
         win_h=$(( option_count + 10 ))
@@ -981,6 +983,18 @@ wait_dry_run_next_step() {
     local total_steps="$2"
     local answer=""
 
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        if [[ "$current_step" -ge "$total_steps" ]]; then
+            whiptail --title "Modo Prueba" --msgbox "Fin del preview." 10 50
+            return 1
+        fi
+
+        if whiptail --title "Modo Prueba" --yes-button "Siguiente" --no-button "Salir" --yesno "Continuar al siguiente paso?" 10 60; then
+            return 0
+        fi
+        return 1
+    fi
+
     if [[ "$current_step" -ge "$total_steps" ]]; then
         read -r -p "Fin del preview. Presiona ENTER para salir... " answer
         return 1
@@ -1009,6 +1023,13 @@ show_dry_run_step() {
     local step_name="$3"
     local step_desc="$4"
     local step_cmds="$5"
+
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        local msg
+        msg="Funcion: ${step_name}\n\nQue haria en modo real:\n  ${step_desc}\n\nComandos clave:\n  ${step_cmds}\n\n(Simulacion: no se ejecuta ningun cambio)"
+        whiptail --title "Modo prueba - Paso ${step_number}/${total_steps}" --msgbox "$msg" 18 78
+        return 0
+    fi
 
     clear
     separator
@@ -1061,7 +1082,11 @@ run_dry_run_preview() {
 
     show_configuration_summary
 
-    read -r -p "Presiona ENTER para iniciar preview paso a paso... " _
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        whiptail --title "Modo Prueba" --msgbox "Presiona OK para iniciar preview paso a paso." 10 64
+    else
+        read -r -p "Presiona ENTER para iniciar preview paso a paso... " _
+    fi
 
     local total_steps=19
     local step=1
@@ -1178,9 +1203,13 @@ run_dry_run_preview() {
         "Muestra resumen final, UUID de backup y proximos pasos post-instalacion." \
         "echo/log del reporte final"
 
-    echo ""
-    success "Preview paso a paso completado"
-    read -r -p "Presiona ENTER para salir... " _
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        whiptail --title "Modo Prueba" --msgbox "Preview paso a paso completado." 10 64
+    else
+        echo ""
+        success "Preview paso a paso completado"
+        read -r -p "Presiona ENTER para salir... " _
+    fi
 }
 
 trap 'handle_error $LINENO' ERR
