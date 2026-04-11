@@ -1525,18 +1525,14 @@ interactive_config() {
 
         local backup_size_calc=$((DISK_SIZE_GB - SYSTEM_SIZE_NUM - 1))
         
-        if [[ "$USE_WHIPTAIL" == "S" ]]; then
-            if ! ui_continue_or_back "Particion Backup" "Espacio restante: ${backup_size_calc}GB\n\nEsta particion estara normalmente desmontada por seguridad.\n\nDeseas seguir?"; then
-                continue
-            fi
-        else
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
             echo ""
             echo "Partición Backup (btrfs - snapshots aislados):"
             echo "  Espacio restante: ${backup_size_calc}GB"
             echo "  Nota: Esta partición estará normalmente desmontada (seguridad)"
         fi
         while true; do
-            CREATE_BACKUP="$(ask_yes_no "Particion Backup" "Crear particion backup?" "S")"
+            CREATE_BACKUP="$(ask_yes_no "Particion Backup" "Espacio restante: ${backup_size_calc}GB\n\nEsta particion estara normalmente desmontada por seguridad.\n\nCrear particion backup?" "S")"
             if [[ -n "$CREATE_BACKUP" ]]; then
                 break
             fi
@@ -1544,11 +1540,7 @@ interactive_config() {
         done
         
         # SWAP
-        if [[ "$USE_WHIPTAIL" == "S" ]]; then
-            if ! ui_continue_or_back "Configuracion de Swap" "RAM detectada: ${RAM_GB}GB\nSugerencia: $SUGGESTED_SWAP ($SWAP_REASON)\n\nDeseas seguir?"; then
-                continue
-            fi
-        else
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
             echo ""
             separator
             echo "CONFIGURACIÓN DE SWAP"
