@@ -405,7 +405,11 @@ GRUB_BTRFS_INSTALLED="N"
 # ============================================
 
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+    local msg="[$(date +'%Y-%m-%d %H:%M:%S')] $*"
+    echo "$msg" >> "$LOG_FILE"
+    if [[ "${USE_WHIPTAIL:-N}" != "S" ]]; then
+        echo "$msg"
+    fi
 }
 
 error() {
@@ -414,15 +418,42 @@ error() {
 }
 
 warning() {
-    echo "⚠️  ADVERTENCIA: $*" | tee -a "$LOG_FILE"
+    local msg="⚠️  ADVERTENCIA: $*"
+    echo "$msg" >> "$LOG_FILE"
+    if [[ "${USE_WHIPTAIL:-N}" != "S" ]]; then
+        echo "$msg"
+    fi
 }
 
 success() {
-    echo "✓ $*" | tee -a "$LOG_FILE"
+    local msg="✓ $*"
+    echo "$msg" >> "$LOG_FILE"
+    if [[ "${USE_WHIPTAIL:-N}" != "S" ]]; then
+        echo "$msg"
+    fi
 }
 
 separator() {
-    echo "========================================" | tee -a "$LOG_FILE"
+    local msg="========================================"
+    echo "$msg" >> "$LOG_FILE"
+    if [[ "${USE_WHIPTAIL:-N}" != "S" ]]; then
+        echo "$msg"
+    fi
+}
+
+ui_textbox_from_text() {
+    local title="$1"
+    local text="$2"
+
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        local tmpfile
+        tmpfile="$(mktemp)"
+        printf "%s\n" "$text" > "$tmpfile"
+        whiptail --title "$title" --textbox "$tmpfile" 24 90
+        rm -f "$tmpfile"
+    else
+        echo "$text"
+    fi
 }
 
 setup_ui() {
@@ -531,6 +562,9 @@ ask_menu() {
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         local radio_args=()
         local i=1
+        local term_cols term_lines
+        local win_w win_h menu_h
+        local option_count
 
         while [[ $i -le $# ]]; do
             local key="${!i}"
@@ -546,7 +580,26 @@ ask_menu() {
             radio_args+=("$key" "$desc" "$status")
         done
 
-        answer="$(whiptail --title "$title" --radiolist "$prompt" 20 90 12 "${radio_args[@]}" 3>&1 1>&2 2>&3)" || return 1
+        option_count=$(( ${#radio_args[@]} / 3 ))
+        term_cols="$(tput cols 2>/dev/null || echo 120)"
+        term_lines="$(tput lines 2>/dev/null || echo 40)"
+
+        # Dimensiones adaptativas para mantener una apariencia mas centrada en distintas consolas.
+        win_w=$(( term_cols * 70 / 100 ))
+        (( win_w < 64 )) && win_w=64
+        (( win_w > 90 )) && win_w=90
+        (( win_w > term_cols - 4 )) && win_w=$(( term_cols - 4 ))
+
+        win_h=$(( option_count + 10 ))
+        (( win_h < 14 )) && win_h=14
+        (( win_h > 24 )) && win_h=24
+        (( win_h > term_lines - 2 )) && win_h=$(( term_lines - 2 ))
+
+        menu_h=$(( win_h - 8 ))
+        (( menu_h < 4 )) && menu_h=4
+        (( menu_h > option_count )) && menu_h=$option_count
+
+        answer="$(whiptail --title "$title" --radiolist "$prompt" "$win_h" "$win_w" "$menu_h" "${radio_args[@]}" 3>&1 1>&2 2>&3)" || return 1
         echo "$answer"
     else
         local i=1
@@ -1209,24 +1262,34 @@ detect_disks() {
         error "No se detectaron discos"
     fi
     
-    separator
-    echo "DISCOS DISPONIBLES:"
-    echo ""
+    if [[ "$USE_WHIPTAIL" != "S" ]]; then
+        separator
+        echo "DISCOS DISPONIBLES:"
+        echo ""
+    fi
     
     for i in "${!disks[@]}"; do
         local idx=$((i + 1))
-        echo "[$idx] ${disks[$i]} (${disk_info[$i]})"
+        if [[ "$USE_WHIPTAIL" != "S" ]]; then
+            echo "[$idx] ${disks[$i]} (${disk_info[$i]})"
+        fi
 
         if [[ -n "$live_root_disk" ]] && [[ "${disks[$i]}" == "/dev/$live_root_disk" ]]; then
-            echo "    ⚠️  Este parece ser el disco desde el que corre el sistema live actual"
+            if [[ "$USE_WHIPTAIL" != "S" ]]; then
+                echo "    ⚠️  Este parece ser el disco desde el que corre el sistema live actual"
+            fi
         fi
         
         if lsblk -n "${disks[$i]}" | grep -q part; then
-            echo "    ⚠️  Contiene particiones:"
-            lsblk -ln -o NAME,SIZE,FSTYPE,LABEL,TYPE "${disks[$i]}" 2>/dev/null | awk '$5=="part"{printf "    %s %s %s %s\n",$1,$2,$3,$4}' || warning "No se pudieron listar las particiones de ${disks[$i]}"
+            if [[ "$USE_WHIPTAIL" != "S" ]]; then
+                echo "    ⚠️  Contiene particiones:"
+                lsblk -ln -o NAME,SIZE,FSTYPE,LABEL,TYPE "${disks[$i]}" 2>/dev/null | awk '$5=="part"{printf "    %s %s %s %s\n",$1,$2,$3,$4}' || warning "No se pudieron listar las particiones de ${disks[$i]}"
+            fi
         fi
     done
-    echo ""
+    if [[ "$USE_WHIPTAIL" != "S" ]]; then
+        echo ""
+    fi
     
     local selection=""
     while true; do
@@ -1555,6 +1618,40 @@ interactive_config() {
 }
 
 show_configuration_summary() {
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        local system_num backup_calc summary_text
+        system_num=$(echo "$SYSTEM_SIZE" | sed 's/[^0-9]//g')
+        backup_calc=$((DISK_SIZE_GB - system_num - 1))
+
+        summary_text="RESUMEN DE CONFIGURACION
+
+HARDWARE
+Disco: $DISK
+Modelo: $(lsblk -ndo MODEL "$DISK" 2>/dev/null | xargs)
+Capacidad: ${DISK_SIZE_GB}GB
+RAM: ${RAM_GB}GB
+
+PARTICIONES
+EFI: $EFI_SIZE (/boot/efi)
+SISTEMA: $SYSTEM_SIZE (btrfs, zstd:1)
+"
+
+        if [[ "$CREATE_BACKUP" == "S" ]]; then
+            summary_text+="BACKUP: ${backup_calc}GB (resto del disco)\n"
+        else
+            summary_text+="BACKUP: no\n"
+        fi
+
+        summary_text+="\nSISTEMA\nDebian: $DEBIAN_RELEASE\nHostname: $HOSTNAME\nUsuario: $USERNAME (sudo)\n"
+        summary_text+="\nREGIONAL\nTimezone: $TIMEZONE\nLocale: $LOCALE\n"
+        summary_text+="\nSOFTWARE\nModo: $SOFTWARE_INSTALL_MODE\nSSH base: $INSTALL_SSH_IN_BASE\n"
+        summary_text+="Repos: non-free=$APT_ENABLE_NONFREE, security=$APT_ENABLE_SECURITY, updates=$APT_ENABLE_UPDATES, deb-src=$APT_ENABLE_DEBSRC\n"
+        summary_text+="\nATENCION: TODOS LOS DATOS EN $DISK SERAN ELIMINADOS"
+
+        ui_textbox_from_text "Resumen de Configuracion" "$summary_text"
+        return 0
+    fi
+
     separator
     echo "RESUMEN DE CONFIGURACIÓN"
     separator
@@ -2059,6 +2156,18 @@ cleanup() {
 }
 
 show_final_summary() {
+    if [[ "$USE_WHIPTAIL" == "S" ]]; then
+        local final_text
+        final_text="INSTALACION COMPLETADA\n\nDebian: $DEBIAN_RELEASE\nHostname: $HOSTNAME\nUsuario: $USERNAME\n"
+        final_text+="\nParticiones:\n$EFI_PART -> /boot/efi\n$SYSTEM_PART -> /\n"
+        if [[ "$CREATE_BACKUP" == "S" ]]; then
+            final_text+="$BACKUP_PART -> backup\nUUID backup: $BACKUP_UUID\n"
+        fi
+        final_text+="\nLog: $LOG_FILE\n\nProximos pasos: snapper, btrbk y software post-boot segun corresponda."
+        ui_textbox_from_text "Instalacion Completada" "$final_text"
+        return 0
+    fi
+
     separator
     echo "✓ INSTALACIÓN COMPLETADA EXITOSAMENTE"
     separator
