@@ -16,16 +16,19 @@ fi
 
 whiptail --title "Test UI Debian Btrfs" --msgbox "Prueba de interfaz whiptail.\n\nSi ves esta ventana, la UI base funciona." 12 70
 
+# Captura robusta del valor seleccionado sin mezclar salida de pantalla.
 choice="$(whiptail \
     --title "Test UI Debian Btrfs" \
     --menu "Selecciona una opcion:" \
     14 70 4 \
     "1" "Seguir" \
     "2" "Salir" \
-    --output-fd 1)" || {
+    3>&1 1>&2 2>&3)" || {
     echo "Cancelado por el usuario (ESC)."
     exit 0
 }
+
+choice="$(printf '%s' "$choice" | tr -d '\r\n' | xargs)"
 
 case "$choice" in
     1)
