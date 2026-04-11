@@ -479,8 +479,9 @@ setup_ui() {
     esac
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
-        # Tema de colores mas uniforme para evitar contraste azul intenso en listas.
-        export NEWT_COLORS='root=black,blue window=black,lightgray border=black,lightgray shadow=black,black title=red,lightgray textbox=black,lightgray entry=black,white label=black,lightgray button=black,lightgray actbutton=white,red compactbutton=black,lightgray listbox=black,lightgray actlistbox=black,lightgray sellistbox=black,lightgray actsellistbox=white,blue checkbox=black,lightgray actcheckbox=white,red helpline=black,lightgray'
+        # Usar tema por defecto de whiptail para mantener el mismo foco visual
+        # que el smoke test (lista y botones con colores de seleccion esperados).
+        unset NEWT_COLORS || true
         log "UI: whiptail"
     else
         log "UI: texto plano"
