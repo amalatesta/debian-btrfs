@@ -2,39 +2,40 @@
 set -euo pipefail
 
 # Smoke test UI en bash+tput (sin whiptail).
-# Base modular para reutilizar en 008.
+# Base generica reusable para 008.
 
-TITLE="Test UI bash+tput"
-PROMPT="Selecciona una opcion:"
-OPTIONS=(
+MAIN_TITLE="Test UI bash+tput"
+MAIN_PROMPT="Selecciona una opcion:"
+MAIN_OPTIONS=(
     "Iniciar instalacion"
     "Modo prueba (dry-run)"
     "Ayuda"
     "Salir"
 )
-BUTTONS=("Aceptar" "Cancelar")
+
+THEME_TITLE="Seleccion de Color"
+THEME_PROMPT="Elige una paleta para continuar:"
 THEME_OPTIONS=("Blanco" "Naranja" "Verde")
 
-selected_option=0
-selected_button=0
-focus="list"   # list | buttons
-confirm_armed=0
-exit_requested=0
-# Smoke test UI en bash+tput (sin whiptail).
-# Base generica reusable para 008.
+BUTTONS=("Aceptar" "Cancelar")
+
 BOX_W=76
-MAIN_TITLE="Test UI bash+tput"
-MAIN_PROMPT="Selecciona una opcion:"
-MAIN_OPTIONS=(
+BOX_H=18
+START_COL=0
+START_ROW=0
+
+MENU_EVENT=""
+MENU_SELECTED=0
+result=""
 
 C_RESET=""
 C_BORDER=""
 C_TITLE=""
 C_PROMPT=""
-BUTTONS=("Aceptar" "Cancelar")
-THEME_OPTIONS=("Blanco" "Naranja" "Verde")
+C_TEXT=""
+C_HELP=""
 C_OPT_NORMAL=""
-MENU_SELECTED=0
+C_FOCUS=""
 C_ORANGE_FG=""
 
 ensure_tty() {
@@ -61,22 +62,22 @@ cleanup() {
 }
 
 init_palette() {
-    C_RESET="$(tput sgr0 2>/dev/null || true)"
+    C_RESET="(B[m"
 
-    if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
-        if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ]]; then
-            C_ORANGE_FG="$(printf '\033[38;5;208m')"
+    if [[ "256" -ge 8 ]]; then
+        if [[ "256" -ge 256 ]]; then
+            C_ORANGE_FG=""[38"
         else
-            C_ORANGE_FG="$(tput setaf 3)"
+            C_ORANGE_FG="[33m"
         fi
         apply_theme "green"
     fi
 }
 
 apply_theme() {
-    local theme="$1"
+    local theme=""
 
-    if [[ "$(tput colors 2>/dev/null || echo 0)" -lt 8 ]]; then
+    if [[ "256" -lt 8 ]]; then
         C_BORDER=""
         C_TITLE=""
         C_PROMPT=""
@@ -88,420 +89,69 @@ apply_theme() {
     fi
 
     local fg bg
-    case "$theme" in
+    case "" in
         white)
-            fg="$(tput setaf 7)"
-            bg="$(tput setab 7)"
+            fg="[37m"
+            bg="[47m"
             ;;
         orange)
-            fg="$C_ORANGE_FG"
-            if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ]]; then
-                bg="$(printf '\033[48;5;208m')"
+            fg=""
+            if [[ "256" -ge 256 ]]; then
+                bg=""[48"
             else
-                bg="$(tput setab 3)"
+                bg="[43m"
             fi
             ;;
         green|*)
-            if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
-                fg="$(printf '\033[92m')"
-                bg="$(printf '\033[102m')"
+            if [[ "256" -ge 16 ]]; then
+                fg=""[92m""
+                bg=""[102m""
             else
-                fg="$(tput setaf 2)"
-                bg="$(tput setab 2)"
+                fg="[32m"
+                bg="[42m"
             fi
             ;;
     esac
 
-    C_BORDER="$fg"
-    C_TITLE="$(tput bold)${fg}"
-    C_PROMPT="$fg"
-    C_TEXT="$fg"
-    C_HELP="$fg"
-    C_OPT_NORMAL="$fg"
-    C_FOCUS="$(tput setaf 0)${bg}"
+    C_BORDER=""
+    C_TITLE="[1m"
+    C_PROMPT=""
+    C_TEXT=""
+    C_HELP=""
+    C_OPT_NORMAL=""
+    C_FOCUS="[30m"
 }
 
 calc_layout() {
     local cols lines
-    cols="$(tput cols)"
-    lines="$(tput lines)"
+    cols="88"
+    lines="19"
 
     BOX_W=76
     BOX_H=18
 
-    (( BOX_W > cols - 2 )) && BOX_W=$((cols - 2))
-    (( BOX_H > lines - 2 )) && BOX_H=$((lines - 2))
+    (( BOX_W > cols - 2 )) && BOX_W=-2
+    (( BOX_H > lines - 2 )) && BOX_H=-2
     (( BOX_W < 50 )) && BOX_W=50
     (( BOX_H < 14 )) && BOX_H=14
 
-    START_COL=$(( (cols - BOX_W) / 2 ))
-    START_ROW=$(( (lines - BOX_H) / 2 ))
+    START_COL=0
+    START_ROW=0
 }
 
-get_key() {
+get_key_raw() {
     local k rest read_status
     IFS= read -rsn1 k
-    read_status=$?
+    read_status=0
 
-    if [[ $read_status -ne 0 ]]; then
+    if [[  -ne 0 ]]; then
         echo "OTHER"
         return 0
     fi
 
-    if [[ -z "${k:-}" ]]; then
-        # En varias TTY, ENTER llega como lectura vacia con status 0.
+    if [[ -z "" ]]; then
         echo "ENTER"
         return 0
     fi
 
-    if [[ "$k" == $'\x1b' ]]; then
-        IFS= read -rsn2 rest || true
-        case "${rest:-}" in
-            "[A") echo "UP" ;;
-            "[B") echo "DOWN" ;;
-            "[C") echo "RIGHT" ;;
-            "[D") echo "LEFT" ;;
-            "OM") echo "ENTER" ;;
-            *) echo "ESC" ;;
-        esac
-        return 0
-    fi
-
-    case "$k" in
-        $'\t') echo "TAB" ;;
-        $'\n'|$'\r') echo "ENTER" ;;
-        q|Q) echo "QUIT" ;;
-        *) echo "OTHER" ;;
-    esac
-}
-
-get_theme_key() {
-    local k rest read_status
-    IFS= read -rsn1 k
-    read_status=$?
-
-    if [[ $read_status -ne 0 ]]; then
-        echo "OTHER"
-        return 0
-    fi
-
-    if [[ -z "${k:-}" ]]; then
-        echo "ENTER"
-        return 0
-    fi
-
-    if [[ "$k" == $'\x1b' ]]; then
-        IFS= read -rsn2 rest || true
-        case "${rest:-}" in
-            "[A") echo "UP" ;;
-            "[B") echo "DOWN" ;;
-            "OM") echo "ENTER" ;;
-            *) echo "ESC" ;;
-        esac
-        return 0
-    fi
-
-    case "$k" in
-        1) echo "THEME1" ;;
-        2) echo "THEME2" ;;
-        3) echo "THEME3" ;;
-        $'\n'|$'\r') echo "ENTER" ;;
-        q|Q) echo "QUIT" ;;
-        *) echo "OTHER" ;;
-    esac
-}
-
-draw_box_line() {
-    local row="$1"
-    local col="$2"
-    local width="$3"
-    tput cup "$row" "$col"
-    printf "%s" "$C_BORDER"
-    printf "+"
-    printf '%*s' $((width - 2)) '' | tr ' ' '-'
-    printf "+"
-    printf "%s" "$C_RESET"
-}
-
-draw_frame() {
-    local i
-    draw_box_line "$START_ROW" "$START_COL" "$BOX_W"
-    for ((i = 1; i < BOX_H - 1; i++)); do
-        tput cup $((START_ROW + i)) "$START_COL"
-        printf "%s|%s" "$C_BORDER" "$C_RESET"
-        tput cup $((START_ROW + i)) $((START_COL + BOX_W - 1))
-        printf "%s|%s" "$C_BORDER" "$C_RESET"
-    done
-    draw_box_line $((START_ROW + BOX_H - 1)) "$START_COL" "$BOX_W"
-}
-
-draw_header() {
-    tput cup $((START_ROW + 1)) $((START_COL + 2))
-    printf "%s%s%s" "$C_TITLE" "$TITLE" "$C_RESET"
-
-    tput cup $((START_ROW + 3)) $((START_COL + 2))
-    printf "%s%s%s" "$C_PROMPT" "$PROMPT" "$C_RESET"
-}
-
-draw_options() {
-    local i opt_row opt_label
-    for i in "${!OPTIONS[@]}"; do
-        opt_row=$((START_ROW + 5 + i))
-        tput cup "$opt_row" $((START_COL + 4))
-        opt_label="$((i + 1)). ${OPTIONS[$i]}"
-
-        if [[ $i -eq $selected_option ]]; then
-            printf "%s %-60s %s" "$C_FOCUS" "$opt_label" "$C_RESET"
-        else
-            printf "%s %-60s %s" "$C_OPT_NORMAL" "$opt_label" "$C_RESET"
-        fi
-    done
-}
-
-draw_buttons() {
-    local btn_row btn_col_accept btn_col_cancel
-    btn_row=$((START_ROW + BOX_H - 3))
-    btn_col_accept=$((START_COL + BOX_W - 28))
-    btn_col_cancel=$((START_COL + BOX_W - 15))
-
-    tput cup "$btn_row" "$btn_col_accept"
-    if [[ "$focus" == "buttons" && $selected_button -eq 0 ]]; then
-        printf "%s< %s >%s" "$C_FOCUS" "${BUTTONS[0]}" "$C_RESET"
-    else
-        printf "%s< %s >%s" "$C_TEXT" "${BUTTONS[0]}" "$C_RESET"
-    fi
-
-    tput cup "$btn_row" "$btn_col_cancel"
-    if [[ "$focus" == "buttons" && $selected_button -eq 1 ]]; then
-        printf "%s< %s >%s" "$C_FOCUS" "${BUTTONS[1]}" "$C_RESET"
-    else
-        printf "%s< %s >%s" "$C_TEXT" "${BUTTONS[1]}" "$C_RESET"
-    fi
-}
-
-draw_help() {
-    tput cup $((START_ROW + BOX_H - 2)) $((START_COL + 2))
-    printf "%sFlechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir%s" "$C_HELP" "$C_RESET"
-}
-
-draw_ui() {
-    calc_layout
-    clear
-    draw_frame
-    draw_header
-    draw_options
-    draw_buttons
-    draw_help
-}
-
-draw_theme_ui() {
-    local selected_theme="$1"
-    local i row label color
-
-    calc_layout
-    clear
-    draw_frame
-
-    tput cup $((START_ROW + 1)) $((START_COL + 2))
-    printf "%sSeleccion de Color%s" "$C_TITLE" "$C_RESET"
-
-    tput cup $((START_ROW + 3)) $((START_COL + 2))
-    printf "%sElige una paleta para continuar:%s" "$C_PROMPT" "$C_RESET"
-
-    for i in "${!THEME_OPTIONS[@]}"; do
-        row=$((START_ROW + 5 + i))
-        label="$((i + 1)). ${THEME_OPTIONS[$i]}"
-        tput cup "$row" $((START_COL + 4))
-
-        case "$i" in
-            0) color="$(tput setaf 7 2>/dev/null || true)" ;;
-            1) color="$C_ORANGE_FG" ;;
-            2) color="$(tput setaf 2 2>/dev/null || true)" ;;
-        esac
-
-        if [[ $i -eq $selected_theme ]]; then
-            printf "%s %-60s %s" "$C_FOCUS" "$label" "$C_RESET"
-        else
-            printf "%s %-60s %s" "$color" "$label" "$C_RESET"
-        fi
-    done
-
-    tput cup $((START_ROW + BOX_H - 2)) $((START_COL + 2))
-    printf "%sFlechas: mover | ENTER: seleccionar color | q: salir%s" "$C_HELP" "$C_RESET"
-}
-
-run_theme_selector() {
-    local selected_theme=2
-    local key
-
-    # El selector inicial se muestra siempre en blanco.
-    apply_theme "white"
-
-    while true; do
-        draw_theme_ui "$selected_theme"
-        key="$(get_theme_key)"
-
-        case "$key" in
-            UP)
-                (( selected_theme > 0 )) && selected_theme=$((selected_theme - 1))
-                ;;
-            DOWN)
-                (( selected_theme < ${#THEME_OPTIONS[@]} - 1 )) && selected_theme=$((selected_theme + 1))
-                ;;
-            THEME1)
-                selected_theme=0
-                apply_theme "white"
-                return 0
-                ;;
-            THEME2)
-                selected_theme=1
-                apply_theme "orange"
-                return 0
-                ;;
-            THEME3)
-                selected_theme=2
-                apply_theme "green"
-                return 0
-                ;;
-            ENTER)
-                case "$selected_theme" in
-                    0) apply_theme "white" ;;
-                    1) apply_theme "orange" ;;
-                    2) apply_theme "green" ;;
-                esac
-                return 0
-                ;;
-            QUIT)
-                result="Cancelado"
-                exit_requested=1
-                return 0
-                ;;
-            ESC|TAB|LEFT|RIGHT|OTHER)
-                ;;
-        esac
-    done
-}
-
-handle_enter() {
-    if [[ "$focus" == "list" ]]; then
-        focus="buttons"
-        selected_button=0
-        confirm_armed=1
-        return 0
-    fi
-
-    if [[ $selected_button -eq 0 && $confirm_armed -eq 1 ]]; then
-        if [[ $selected_option -eq 3 ]]; then
-            result="Salir"
-            exit_requested=1
-        else
-            focus="list"
-            confirm_armed=0
-        fi
-        return 0
-    fi
-
-    # Cancelar vuelve a la lista.
-    focus="list"
-    confirm_armed=0
-}
-
-handle_key() {
-    local key="$1"
-
-    case "$key" in
-        UP)
-            if [[ "$focus" == "list" ]]; then
-                if (( selected_option > 0 )); then
-                    selected_option=$((selected_option - 1))
-                else
-                    selected_option=$((${#OPTIONS[@]} - 1))
-                fi
-            else
-                # Cualquier tecla distinta de ENTER desarma confirmacion.
-                confirm_armed=0
-            fi
-            ;;
-        DOWN)
-            if [[ "$focus" == "list" ]]; then
-                if (( selected_option < ${#OPTIONS[@]} - 1 )); then
-                    selected_option=$((selected_option + 1))
-                else
-                    selected_option=0
-                fi
-            else
-                confirm_armed=0
-            fi
-            ;;
-        LEFT)
-            if [[ "$focus" == "buttons" ]]; then
-                selected_button=0
-                confirm_armed=0
-            fi
-            ;;
-        RIGHT)
-            if [[ "$focus" == "buttons" ]]; then
-                selected_button=1
-                confirm_armed=0
-            fi
-            ;;
-        TAB)
-            if [[ "$focus" == "list" ]]; then
-                focus="buttons"
-                # TAB solo mueve foco. No debe habilitar salida por Enter.
-                confirm_armed=0
-            else
-                focus="list"
-                confirm_armed=0
-            fi
-            ;;
-        ENTER)
-            handle_enter
-            ;;
-        ESC)
-            focus="list"
-            confirm_armed=0
-            ;;
-        QUIT)
-            result="Cancelado"
-            exit_requested=1
-            ;;
-        OTHER)
-            if [[ "$focus" == "buttons" ]]; then
-                confirm_armed=0
-            fi
-            ;;
-    esac
-}
-
-main() {
-    ensure_tty
-    init_palette
-    setup_terminal
-    trap cleanup EXIT INT TERM
-
-    run_theme_selector
-
-    if [[ $exit_requested -eq 1 ]]; then
-        cleanup
-        trap - EXIT INT TERM
-        printf "Resultado: %s\n" "$result"
-        return 0
-    fi
-
-    while true; do
-        draw_ui
-        key="$(get_key)"
-        handle_key "$key"
-
-        if [[ $exit_requested -eq 1 ]]; then
-            break
-        fi
-    done
-
-    cleanup
-    trap - EXIT INT TERM
-    printf "Resultado: %s\n" "$result"
-}
-
-main
+    if [[ "" == $
