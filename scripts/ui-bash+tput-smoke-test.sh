@@ -72,7 +72,8 @@ get_key() {
     IFS= read -rsn1 k || true
 
     if [[ -z "${k:-}" ]]; then
-        echo "NONE"
+        # En este modo de lectura, ENTER puede llegar como cadena vacia.
+        echo "ENTER"
         return 0
     fi
 
@@ -257,7 +258,7 @@ while true; do
             result="Cancelado"
             break
             ;;
-        NONE|OTHER)
+        OTHER)
             ;;
     esac
 
