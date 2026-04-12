@@ -561,7 +561,7 @@ ask_input() {
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
-        answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+        answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" --output-fd 1 2>/dev/tty)" || return 1
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
@@ -578,7 +578,7 @@ ask_password() {
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
-        answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 3>&1 1>&2 2>&3)" || return 1
+        answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 --output-fd 1 2>/dev/tty)" || return 1
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
@@ -651,7 +651,7 @@ ask_menu() {
         (( menu_h < 4 )) && menu_h=4
         (( menu_h > option_count )) && menu_h=$option_count
 
-        answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
+        answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" --output-fd 1 2>/dev/tty)" || return 1
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
