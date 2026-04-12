@@ -558,10 +558,17 @@ ask_input() {
     local prompt="$2"
     local default_value="$3"
     local answer=""
+    local tmp_answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
-        answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+        tmp_answer="$(mktemp)"
+        if ! whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 2>"$tmp_answer"; then
+            rm -f "$tmp_answer"
+            return 1
+        fi
+        answer="$(cat "$tmp_answer")"
+        rm -f "$tmp_answer"
         answer="${answer//$'\r'/}"
         answer="${answer//$'\n'/}"
         answer="${answer#"${answer%%[![:space:]]*}"}"
@@ -580,10 +587,17 @@ ask_password() {
     local title="$1"
     local prompt="$2"
     local answer=""
+    local tmp_answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
-        answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 3>&1 1>&2 2>&3)" || return 1
+        tmp_answer="$(mktemp)"
+        if ! whiptail --title "$title" --passwordbox "$prompt" 12 78 2>"$tmp_answer"; then
+            rm -f "$tmp_answer"
+            return 1
+        fi
+        answer="$(cat "$tmp_answer")"
+        rm -f "$tmp_answer"
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
@@ -632,6 +646,7 @@ ask_menu() {
     local default_value="$3"
     shift 3
     local answer=""
+    local tmp_answer=""
 
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
@@ -656,7 +671,17 @@ ask_menu() {
         (( menu_h < 4 )) && menu_h=4
         (( menu_h > option_count )) && menu_h=$option_count
 
-        answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
+        tmp_answer="$(mktemp)"
+        if ! whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 2>"$tmp_answer"; then
+            rm -f "$tmp_answer"
+            return 1
+        fi
+        answer="$(cat "$tmp_answer")"
+        rm -f "$tmp_answer"
+        answer="${answer//$'\r'/}"
+        answer="${answer//$'\n'/}"
+        answer="${answer#"${answer%%[![:space:]]*}"}"
+        answer="${answer%"${answer##*[![:space:]]}"}"
         ui_redraw_tty
         echo "$answer"
     else
