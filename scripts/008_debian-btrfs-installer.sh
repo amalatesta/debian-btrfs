@@ -480,16 +480,16 @@ run_with_report() {
 ask_efi_in_plain_terminal() {
     local option2_path="$1"
     local locale_value=""
-    local language_code=""
+    local language_code="" suggested_language=""
     local language_choice=""
-    local location_value=""
+    local location_value="" suggested_location=""
     local location_choice=""
-    local keyboard_value=""
-    local timezone_value=""
-    local efi_size=""
-    local system_size=""
-    local create_backup=""
-    local swap_size=""
+    local keyboard_value="" suggested_keyboard=""
+    local timezone_value="" suggested_timezone=""
+    local efi_size="" suggested_efi=""
+    local system_size="" suggested_system=""
+    local create_backup="" suggested_backup=""
+    local swap_size="" suggested_swap=""
     local defaults_output key value
     local default_efi="1G"
     local default_system="64G"
@@ -530,6 +530,7 @@ ask_efi_in_plain_terminal() {
         de_*) language_code="de" ;;
         *) language_code="en" ;;
     esac
+    suggested_language="$language_code"
     printf "[dry-run]   1) Espanol\n" > /dev/tty
     printf "[dry-run]   2) English\n" > /dev/tty
     printf "[dry-run]   3) Portugues\n" > /dev/tty
@@ -561,6 +562,8 @@ ask_efi_in_plain_terminal() {
         America/Montevideo) location_value="Uruguay" ;;
         *) location_value="Internacional" ;;
     esac
+    suggested_location="$location_value"
+    suggested_timezone="$default_timezone"
 
     clear > /dev/tty
     printf "\n[dry-run] pais / ubicacion:\n" > /dev/tty
@@ -621,6 +624,11 @@ ask_efi_in_plain_terminal() {
     if [[ -z "$default_keyboard" ]] && [[ "$locale_value" == es_* ]]; then
         default_keyboard="es"
     fi
+    suggested_keyboard="$default_keyboard"
+    suggested_efi="$default_efi"
+    suggested_system="$default_system"
+    suggested_swap="$default_swap"
+    suggested_backup="$default_backup"
 
     if command -v dpkg-reconfigure >/dev/null 2>&1; then
         clear > /dev/tty
@@ -731,15 +739,31 @@ ask_efi_in_plain_terminal() {
     clear > /dev/tty
     printf "\n[dry-run] RESUMEN DE CONFIGURACION:\n\n" > /dev/tty
     printf "[dry-run] === SISTEMA ===\n" > /dev/tty
-    printf "[dry-run] Idioma:    %s\n" "$language_code" > /dev/tty
-    printf "[dry-run] Ubicacion: %s\n" "$location_value" > /dev/tty
-    printf "[dry-run] Teclado:   %s\n" "$keyboard_value" > /dev/tty
-    printf "[dry-run] Timezone:  %s\n" "$timezone_value" > /dev/tty
+    printf "[dry-run] Idioma:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_language" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$language_code" > /dev/tty
+    printf "[dry-run] Ubicacion:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_location" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$location_value" > /dev/tty
+    printf "[dry-run] Teclado:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_keyboard" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$keyboard_value" > /dev/tty
+    printf "[dry-run] Timezone:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_timezone" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$timezone_value" > /dev/tty
     printf "\n[dry-run] === PARTICIONES ===\n" > /dev/tty
-    printf "[dry-run] EFI:       %s\n" "$efi_size" > /dev/tty
-    printf "[dry-run] Sistema:   %s\n" "$system_size" > /dev/tty
-    printf "[dry-run] Swap:      %s\n" "$swap_size" > /dev/tty
-    printf "[dry-run] Backup:    %s\n" "$create_backup" > /dev/tty
+    printf "[dry-run] EFI:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_efi" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$efi_size" > /dev/tty
+    printf "[dry-run] Sistema:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_system" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$system_size" > /dev/tty
+    printf "[dry-run] Swap:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_swap" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$swap_size" > /dev/tty
+    printf "[dry-run] Backup:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_backup" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$create_backup" > /dev/tty
     printf "\n[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
 
