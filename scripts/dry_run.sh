@@ -66,8 +66,16 @@ normalize_size_gib() {
 size_gib_to_int() {
     local raw="$1"
     raw="$(normalize_size_gib "$raw")"
-    raw="${raw%G}"
-    printf '%s\n' "$raw"
+    if [[ "$raw" =~ ^[0-9]+G$ ]]; then
+        printf '%s\n' "${raw%G}"
+        return 0
+    fi
+    if [[ "$raw" =~ ^[0-9]+M$ ]]; then
+        local mib="${raw%M}"
+        printf '%s\n' "$(( (mib + 1023) / 1024 ))"
+        return 0
+    fi
+    printf '0\n'
 }
 
 calculate_recommendations() {
@@ -281,27 +289,36 @@ analyze_and_suggest() {
     printf "[dry-run] disco objetivo sugerido: %s\n" "$DISK"
     printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DISK_SIZE_GB"
     printf "[dry-run] RAM usada para calculo: %sGB\n" "$RAM_GB"
-    printf "[dry-run] --- sugerido por analisis ---\n"
-    printf "[dry-run] EFI sugerido: %s\n" "$SUGGESTED_EFI"
-    printf "[dry-run] Sistema sugerido: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
+    printf "[dry-run] Sugerido --> EFI: %s\n" "$SUGGESTED_EFI"
+    printf "[dry-run] Elegido  --> EFI: %s\n" "$SELECTED_EFI_SIZE"
+
+    printf "[dry-run] Sugerido --> Sistema: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
+    printf "[dry-run] Elegido  --> Sistema: %s\n" "$SELECTED_SYSTEM_SIZE"
+
     if [[ "$CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run] Backup sugerido: %sG\n" "$SUGGESTED_BACKUP_GB"
+        printf "[dry-run] Sugerido --> Backup: %sG\n" "$SUGGESTED_BACKUP_GB"
     else
-        printf "[dry-run] Backup sugerido: no crear (sin espacio suficiente)\n"
+        printf "[dry-run] Sugerido --> Backup: no crear (sin espacio suficiente)\n"
     fi
-    printf "[dry-run] Swapfile sugerido: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
-    printf "[dry-run] Hostname sugerido: %s\n" "$SUGGESTED_HOSTNAME"
-    printf "[dry-run] Timezone sugerido: %s\n" "$SUGGESTED_TIMEZONE"
-    printf "[dry-run] Locale sugerido: %s\n" "$SUGGESTED_LOCALE"
-    printf "[dry-run] --- configuracion final elegida ---\n"
-    printf "[dry-run] EFI final: %s\n" "$SELECTED_EFI_SIZE"
-    printf "[dry-run] Sistema final: %s\n" "$SELECTED_SYSTEM_SIZE"
+
     if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run] Backup final: %sG\n" "$EFFECTIVE_BACKUP_GB"
+        printf "[dry-run] Elegido  --> Backup: %sG\n" "$EFFECTIVE_BACKUP_GB"
     else
-        printf "[dry-run] Backup final: no crear\n"
+        printf "[dry-run] Elegido  --> Backup: no crear\n"
     fi
-    printf "[dry-run] Swapfile final: %s\n" "$SUGGESTED_SWAP"
+
+    printf "[dry-run] Sugerido --> Swapfile: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
+    printf "[dry-run] Elegido  --> Swapfile: %s\n" "$SUGGESTED_SWAP"
+
+    printf "[dry-run] Sugerido --> Hostname: %s\n" "$SUGGESTED_HOSTNAME"
+    printf "[dry-run] Elegido  --> Hostname: %s\n" "$SUGGESTED_HOSTNAME"
+
+    printf "[dry-run] Sugerido --> Timezone: %s\n" "$SUGGESTED_TIMEZONE"
+    printf "[dry-run] Elegido  --> Timezone: %s\n" "$SUGGESTED_TIMEZONE"
+
+    printf "[dry-run] Sugerido --> Locale: %s\n" "$SUGGESTED_LOCALE"
+    printf "[dry-run] Elegido  --> Locale: %s\n" "$SUGGESTED_LOCALE"
+
     ok "recomendaciones calculadas con la misma base de opcion 1"
 }
 
