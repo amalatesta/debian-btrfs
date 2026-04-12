@@ -978,7 +978,17 @@ normalize_software_mode() {
 }
 
 is_valid_size_gib() {
-    [[ "$1" =~ ^[1-9][0-9]*G$ ]]
+    local value
+    value="$(normalize_size_gib "$1")"
+    [[ "$value" =~ ^[1-9][0-9]*G$ ]]
+}
+
+normalize_size_gib() {
+    local value="${1:-}"
+    # Limpia CR/LF/tabs/espacios y normaliza sufijo a mayúscula.
+    value="$(printf '%s' "$value" | tr -d '\r\n\t ')"
+    value="${value^^}"
+    echo "$value"
 }
 
 analyze_locale_timezone() {
@@ -1536,6 +1546,7 @@ interactive_config() {
         fi
         while true; do
             EFI_SIZE="$(ask_input "Particion EFI" "Tamaño de EFI (ej: 1G)" "$SUGGESTED_EFI")" || error "Configuracion cancelada"
+            EFI_SIZE="$(normalize_size_gib "$EFI_SIZE")"
             if is_valid_size_gib "$EFI_SIZE"; then
                 break
             fi
@@ -1549,6 +1560,7 @@ interactive_config() {
         fi
         while true; do
             SYSTEM_SIZE="$(ask_input "Particion Sistema" "Tamaño de sistema (ej: 80G)" "${SUGGESTED_SYSTEM_GB}G")" || error "Configuracion cancelada"
+            SYSTEM_SIZE="$(normalize_size_gib "$SYSTEM_SIZE")"
             if ! is_valid_size_gib "$SYSTEM_SIZE"; then
                 ui_warn "Tamaño de sistema invalido. Usa formato entero en GiB, por ejemplo: 80G"
                 continue
@@ -1594,6 +1606,7 @@ interactive_config() {
         fi
         while true; do
             SWAP_SIZE="$(ask_input "Swap" "Tamaño de swap (ej: 8G)" "$SUGGESTED_SWAP")" || error "Configuracion cancelada"
+            SWAP_SIZE="$(normalize_size_gib "$SWAP_SIZE")"
             if is_valid_size_gib "$SWAP_SIZE"; then
                 break
             fi
