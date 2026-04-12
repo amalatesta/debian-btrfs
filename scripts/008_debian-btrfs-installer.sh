@@ -47,6 +47,7 @@ TEXT_BOX_PAGE_LINE_LIMIT=16
 MENU_EVENT=""
 MENU_SELECTED=0
 result=""
+DRYRUN_SELECTED_EFI="1G"
 
 C_RESET=""
 C_BORDER=""
@@ -437,57 +438,8 @@ run_with_report() {
 
     log_file="$(mktemp)"
 
-    (bash -lc "$command" >"$log_file" 2>&1) &
-    local run_pid=$!
-    local spinner=("|" "/" "-" "\\")
-    local spin_idx=0
-    local frame_count=0
-    local min_frames=12
-    local profile_spec
-    local p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit
-    local STATUS_LINES
-    local TAIL_LINES
-
-    profile_spec="$(get_text_box_profile "compact")"
-    IFS='|' read -r p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit <<< "$profile_spec"
-
-    while true; do
-        mapfile -t TAIL_LINES < <(tail -n 3 "$log_file" 2>/dev/null || true)
-
-        STATUS_LINES=(
-            "Ejecutando analisis dry-run..."
-            ""
-            "Esto puede tardar unos segundos segun el hardware."
-            ""
-            "Estado: en curso ${spinner[$spin_idx]}"
-            ""
-            "Ultimo log:"
-        )
-
-        if (( ${#TAIL_LINES[@]} > 0 )); then
-            STATUS_LINES+=("${TAIL_LINES[-1]}")
-        else
-            STATUS_LINES+=("iniciando...")
-        fi
-
-        STATUS_LINES+=("" "No cierres esta pantalla.")
-
-        draw_centered_text_frame "$title" STATUS_LINES "Procesando..." "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
-        spin_idx=$(( (spin_idx + 1) % 4 ))
-        frame_count=$((frame_count + 1))
-
-        if ! kill -0 "$run_pid" 2>/dev/null && (( frame_count >= min_frames )); then
-            break
-        fi
-
-        sleep 0.12
-    done
-
-    if wait "$run_pid"; then
-        rc=0
-    else
-        rc=$?
-    fi
+    (bash -lc "$command" >"$log_file" 2>&1)
+    rc=$?
 
     mapfile -t REPORT_LINES < "$log_file"
     if (( ${#REPORT_LINES[@]} == 0 )); then
@@ -521,21 +473,21 @@ ask_efi_in_plain_terminal() {
     local efi_size=""
 
     restore_terminal
-    clear
+    clear > /dev/tty
 
-    printf "[dry-run] modo terminal (fuera del menu UI)\n"
-    printf "[dry-run] configuracion previa de simulacion\n\n"
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
 
-    read -r -p "Tamano EFI para simulacion [1G]: " efi_size
+    read -r -p "Tamano EFI para simulacion [1G]: " efi_size < /dev/tty
     efi_size="${efi_size:-1G}"
+    DRYRUN_SELECTED_EFI="$efi_size"
 
-    printf "\n[dry-run] EFI elegido: %s\n" "$efi_size"
-    read -r -p "Presiona ENTER para volver a la UI y ver el informe..." _
+    printf "\n[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
+    printf "[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
+    sleep 0.6
 
     setup_terminal
     flush_input_buffer
-
-    printf '%s\n' "$efi_size"
     return 0
 }
 
@@ -569,15 +521,15 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if ! efi_size="$(ask_efi_in_plain_terminal)"; then
+    if ! ask_efi_in_plain_terminal; then
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$efi_size\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
-            "EFI elegido para la simulacion: $efi_size"
+            "EFI elegido para la simulacion: $DRYRUN_SELECTED_EFI"
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
         )
