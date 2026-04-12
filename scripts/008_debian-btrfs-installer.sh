@@ -480,6 +480,8 @@ run_with_report() {
 ask_efi_in_plain_terminal() {
     local option2_path="$1"
     local locale_value=""
+    local language_code=""
+    local language_choice=""
     local location_value=""
     local location_choice=""
     local keyboard_value=""
@@ -525,9 +527,37 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] 2) Pais / ubicacion\n" > /dev/tty
     printf "[dry-run] 3) Teclado\n\n" > /dev/tty
 
-    read -r -p "Locale [${default_locale}] : " locale_value < /dev/tty
-    locale_value="${locale_value:-$default_locale}"
-    DRYRUN_SELECTED_LOCALE="$locale_value"
+    case "$default_locale" in
+        es_*) language_code="es" ;;
+        pt_*) language_code="pt" ;;
+        fr_*) language_code="fr" ;;
+        de_*) language_code="de" ;;
+        *) language_code="en" ;;
+    esac
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] idioma (estilo Debian):\n" > /dev/tty
+    printf "[dry-run]   1) Espanol\n" > /dev/tty
+    printf "[dry-run]   2) English\n" > /dev/tty
+    printf "[dry-run]   3) Portugues\n" > /dev/tty
+    printf "[dry-run]   4) Francais\n" > /dev/tty
+    printf "[dry-run]   5) Deutsch\n" > /dev/tty
+    printf "[dry-run]   6) Otro (manual)\n\n" > /dev/tty
+    read -r -p "Opcion [1]: " language_choice < /dev/tty
+    language_choice="${language_choice:-1}"
+    case "$language_choice" in
+        1) language_code="es" ;;
+        2) language_code="en" ;;
+        3) language_code="pt" ;;
+        4) language_code="fr" ;;
+        5) language_code="de" ;;
+        6)
+            read -r -p "Idioma (codigo ISO, ej: es/en/pt) [${language_code}] : " language_code < /dev/tty
+            language_code="${language_code:-en}"
+            ;;
+        *) language_code="es" ;;
+    esac
 
     case "$default_timezone" in
         America/Argentina*) location_value="Argentina" ;;
@@ -555,19 +585,47 @@ ask_efi_in_plain_terminal() {
     read -r -p "Opcion [9]: " location_choice < /dev/tty
     location_choice="${location_choice:-9}"
     case "$location_choice" in
-        1) location_value="Argentina"; default_timezone="America/Argentina/Buenos_Aires"; default_locale="es_AR.UTF-8"; default_keyboard="latam" ;;
-        2) location_value="Espana"; default_timezone="Europe/Madrid"; default_locale="es_ES.UTF-8"; default_keyboard="es" ;;
-        3) location_value="Mexico"; default_timezone="America/Mexico_City"; default_locale="es_MX.UTF-8"; default_keyboard="latam" ;;
-        4) location_value="Colombia"; default_timezone="America/Bogota"; default_locale="es_CO.UTF-8"; default_keyboard="latam" ;;
-        5) location_value="Chile"; default_timezone="America/Santiago"; default_locale="es_CL.UTF-8"; default_keyboard="latam" ;;
-        6) location_value="Peru"; default_timezone="America/Lima"; default_locale="es_PE.UTF-8"; default_keyboard="latam" ;;
-        7) location_value="Uruguay"; default_timezone="America/Montevideo"; default_locale="es_UY.UTF-8"; default_keyboard="latam" ;;
-        8) location_value="Internacional"; default_timezone="UTC"; default_locale="en_US.UTF-8"; default_keyboard="us" ;;
+        1) location_value="Argentina"; default_timezone="America/Argentina/Buenos_Aires"; default_keyboard="latam" ;;
+        2) location_value="Espana"; default_timezone="Europe/Madrid"; default_keyboard="es" ;;
+        3) location_value="Mexico"; default_timezone="America/Mexico_City"; default_keyboard="latam" ;;
+        4) location_value="Colombia"; default_timezone="America/Bogota"; default_keyboard="latam" ;;
+        5) location_value="Chile"; default_timezone="America/Santiago"; default_keyboard="latam" ;;
+        6) location_value="Peru"; default_timezone="America/Lima"; default_keyboard="latam" ;;
+        7) location_value="Uruguay"; default_timezone="America/Montevideo"; default_keyboard="latam" ;;
+        8) location_value="Internacional"; default_timezone="UTC"; default_keyboard="us" ;;
         *)
             read -r -p "Pais/ubicacion (texto libre) [${location_value}] : " location_value < /dev/tty
             location_value="${location_value:-Internacional}"
             ;;
     esac
+
+    case "$language_code" in
+        es)
+            case "$location_value" in
+                Argentina) default_locale="es_AR.UTF-8" ;;
+                Espana) default_locale="es_ES.UTF-8" ;;
+                Mexico) default_locale="es_MX.UTF-8" ;;
+                Colombia) default_locale="es_CO.UTF-8" ;;
+                Chile) default_locale="es_CL.UTF-8" ;;
+                Peru) default_locale="es_PE.UTF-8" ;;
+                Uruguay) default_locale="es_UY.UTF-8" ;;
+                *) default_locale="es_ES.UTF-8" ;;
+            esac
+            ;;
+        en) default_locale="en_US.UTF-8" ;;
+        pt)
+            if [[ "$location_value" == "Espana" || "$location_value" == "Internacional" ]]; then
+                default_locale="pt_PT.UTF-8"
+            else
+                default_locale="pt_BR.UTF-8"
+            fi
+            ;;
+        fr) default_locale="fr_FR.UTF-8" ;;
+        de) default_locale="de_DE.UTF-8" ;;
+        *) default_locale="en_US.UTF-8" ;;
+    esac
+    locale_value="$default_locale"
+    DRYRUN_SELECTED_LOCALE="$locale_value"
 
     if [[ -z "$default_keyboard" ]] && [[ "$locale_value" == es_* ]]; then
         default_keyboard="es"
@@ -697,6 +755,7 @@ ask_efi_in_plain_terminal() {
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] Idioma elegido: %s\n" "$language_code" > /dev/tty
     printf "[dry-run] Locale elegido: %s\n" "$locale_value" > /dev/tty
     printf "[dry-run] Ubicacion elegida: %s\n" "$location_value" > /dev/tty
     printf "[dry-run] Teclado elegido: %s\n" "$keyboard_value" > /dev/tty
