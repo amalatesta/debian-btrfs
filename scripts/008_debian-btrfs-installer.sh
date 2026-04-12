@@ -332,55 +332,30 @@ show_command_preview() {
     show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu" "wide-log"
 }
 
-prompt_text_input() {
-    local title="$1"
-    local prompt="$2"
-    local default_value="$3"
-    local profile="${4:-compact}"
-    local value="$default_value"
-    local input_key rest
+choose_efi_size() {
+    local suggested="$1"
+    local EFI_SIM_OPTIONS=(
+        "Aceptar sugerido (${suggested})"
+        "1G"
+        "2G"
+        "4G"
+        "Cancelar"
+    )
 
-    while true; do
-        local INPUT_LINES=(
-            "$prompt"
-            ""
-            "Valor sugerido editable:"
-            "$value"
-            ""
-            "ENTER acepta el valor mostrado."
-        )
+    run_menu "SIMULACION | EFI" "Elige tamano de EFI para simulacion" EFI_SIM_OPTIONS 0 0 "Flechas: mover | ENTER: confirmar | Esc/q: cancelar" 1 0
 
-        show_info_box "$title" INPUT_LINES "Escribir | Backspace: borrar | ENTER: aceptar | Esc/q: cancelar" "$profile"
+    if [[ "$MENU_EVENT" == "QUIT" ]]; then
+        return 1
+    fi
 
-        IFS= read -rsn1 input_key || true
-
-        if [[ -z "${input_key:-}" ]]; then
-            printf '%s\n' "$value"
-            return 0
-        fi
-
-        case "$input_key" in
-            $'\x1b')
-                IFS= read -rsn2 rest || true
-                return 1
-                ;;
-            $'\177'|$'\b'|$'\x08')
-                value="${value%?}"
-                ;;
-            q|Q)
-                return 1
-                ;;
-            $'\n'|$'\r')
-                printf '%s\n' "$value"
-                return 0
-                ;;
-            *)
-                if [[ "$input_key" =~ [[:print:]] ]]; then
-                    value+="$input_key"
-                fi
-                ;;
-        esac
-    done
+    case "$MENU_SELECTED" in
+        0) printf '%s\n' "$suggested" ;;
+        1) printf '1G\n' ;;
+        2) printf '2G\n' ;;
+        3) printf '4G\n' ;;
+        4) return 1 ;;
+        *) printf '%s\n' "$suggested" ;;
+    esac
 }
 
 confirm_yes_no() {
@@ -447,7 +422,34 @@ run_with_report() {
 
     log_file="$(mktemp)"
 
-    (bash -lc "$command" >"$log_file" 2>&1)
+    (bash -lc "$command" >"$log_file" 2>&1) &
+    local run_pid=$!
+    local spinner=("|" "/" "-" "\\")
+    local spin_idx=0
+    local profile_spec
+    local p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit
+    local STATUS_LINES
+
+    profile_spec="$(get_text_box_profile "compact")"
+    IFS='|' read -r p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit <<< "$profile_spec"
+
+    while kill -0 "$run_pid" 2>/dev/null; do
+        STATUS_LINES=(
+            "Ejecutando analisis dry-run..."
+            ""
+            "Esto puede tardar unos segundos segun el hardware."
+            ""
+            "Estado: en curso ${spinner[$spin_idx]}"
+            ""
+            "No cierres esta pantalla."
+        )
+
+        draw_centered_text_frame "$title" STATUS_LINES "Procesando..." "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
+        spin_idx=$(( (spin_idx + 1) % 4 ))
+        sleep 0.12
+    done
+
+    wait "$run_pid"
     rc=$?
 
     mapfile -t REPORT_LINES < "$log_file"
@@ -509,7 +511,7 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if ! efi_size="$(prompt_text_input "SIMULACION | EFI" "Tamaño de EFI (ej: 1G)" "1G" "compact")"; then
+    if ! efi_size="$(choose_efi_size "1G")"; then
         return 0
     fi
 
