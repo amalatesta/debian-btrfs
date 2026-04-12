@@ -680,7 +680,13 @@ ask_menu() {
         answer="$(cat "$tmp_answer")"
         rm -f "$tmp_answer"
         answer="$(sanitize_dialog_value "$answer")"
-        [[ -z "$answer" ]] && answer="$default_value"
+        if [[ -z "$answer" ]]; then
+            # Si el dialogo visual devolvio vacio por problemas de TTY/newt,
+            # cambiamos a texto y repetimos este mismo menu.
+            fallback_to_text_ui
+            ask_menu "$title" "$prompt" "$default_value" "$@"
+            return $?
+        fi
         ui_redraw_tty
         echo "$answer"
     else
