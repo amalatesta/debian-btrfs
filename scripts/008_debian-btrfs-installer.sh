@@ -7,8 +7,7 @@ set -euo pipefail
 #
 # Historial de mejoras
 # - 0008.0001 - Base limpia - OK
-# - 0008.0002 - Enter confirma opcion resaltada (equivale a Aceptar)
-# - 0008.0003 - Doble confirmacion: seleccionar opcion y luego confirmar en Aceptar
+# - 0008.0002 - Doble confirmacion: seleccionar opcion y luego confirmar en Aceptar
 # ============================================
 
 if ! command -v whiptail >/dev/null 2>&1; then
