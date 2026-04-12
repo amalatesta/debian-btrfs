@@ -730,15 +730,16 @@ ask_efi_in_plain_terminal() {
 
     clear > /dev/tty
     printf "\n[dry-run] RESUMEN DE CONFIGURACION:\n\n" > /dev/tty
-    printf "[dry-run] Idioma: %s\n" "$language_code" > /dev/tty
-    printf "[dry-run] Locale: %s\n" "$locale_value" > /dev/tty
+    printf "[dry-run] === SISTEMA ===\n" > /dev/tty
+    printf "[dry-run] Idioma:    %s\n" "$language_code" > /dev/tty
     printf "[dry-run] Ubicacion: %s\n" "$location_value" > /dev/tty
-    printf "[dry-run] Teclado: %s\n" "$keyboard_value" > /dev/tty
-    printf "[dry-run] Timezone: %s\n" "$timezone_value" > /dev/tty
-    printf "[dry-run] EFI: %s\n" "$efi_size" > /dev/tty
-    printf "[dry-run] Sistema: %s\n" "$system_size" > /dev/tty
-    printf "[dry-run] Swap: %s\n" "$swap_size" > /dev/tty
-    printf "[dry-run] Backup: %s\n" "$create_backup" > /dev/tty
+    printf "[dry-run] Teclado:   %s\n" "$keyboard_value" > /dev/tty
+    printf "[dry-run] Timezone:  %s\n" "$timezone_value" > /dev/tty
+    printf "\n[dry-run] === PARTICIONES ===\n" > /dev/tty
+    printf "[dry-run] EFI:       %s\n" "$efi_size" > /dev/tty
+    printf "[dry-run] Sistema:   %s\n" "$system_size" > /dev/tty
+    printf "[dry-run] Swap:      %s\n" "$swap_size" > /dev/tty
+    printf "[dry-run] Backup:    %s\n" "$create_backup" > /dev/tty
     printf "\n[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
 
