@@ -7,6 +7,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+DISK=""
+DISK_SIZE_GB=0
+RAM_GB=0
+SUGGESTED_EFI="1G"
+SUGGESTED_SYSTEM_GB=0
+SUGGESTED_SYSTEM_PCT=0
+SUGGESTED_BACKUP_GB=0
+SUGGESTED_SWAP=""
+SWAP_REASON=""
+SUGGESTED_TIMEZONE=""
+SUGGESTED_LOCALE=""
+SUGGESTED_HOSTNAME="debian-pc"
+CREATE_BACKUP="S"
+
 step() {
     printf "\n[dry-run][step] %s\n" "$1"
 }
@@ -33,7 +47,7 @@ have_cmd() {
 }
 
 analyze_memory() {
-    step "1/7 - Analisis de memoria"
+    step "1/8 - Analisis de memoria"
 
     if [[ ! -f /proc/meminfo ]]; then
         warn "no se puede leer /proc/meminfo"
@@ -75,7 +89,7 @@ analyze_memory() {
 }
 
 analyze_cpu() {
-    step "2/7 - Analisis de CPU"
+    step "2/8 - Analisis de CPU"
 
     if [[ ! -f /proc/cpuinfo ]]; then
         warn "no se puede leer /proc/cpuinfo"
@@ -102,6 +116,120 @@ analyze_cpu() {
     fi
 }
 
+detect_suggested_disk() {
+    local root_source live_root_disk candidate_name candidate_size
+    local -a candidates
+    local best_size=0
+
+    candidates=()
+
+    if have_cmd findmnt; then
+        root_source="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+        live_root_disk="$(lsblk -ndo PKNAME "$root_source" 2>/dev/null || true)"
+    fi
+
+    while IFS='|' read -r candidate_name candidate_size; do
+        [[ -z "$candidate_name" ]] && continue
+        candidates+=("${candidate_name}|${candidate_size}")
+    done < <(lsblk -bdn -o NAME,SIZE,TYPE 2>/dev/null | awk '$3=="disk"{print $1"|"int($2/1024/1024/1024)}')
+
+    if (( ${#candidates[@]} == 0 )); then
+        warn "no se detectaron discos para simulacion"
+        return 1
+    fi
+
+    for candidate in "${candidates[@]}"; do
+        IFS='|' read -r candidate_name candidate_size <<< "$candidate"
+        if [[ -n "$live_root_disk" && "$candidate_name" == "$live_root_disk" ]]; then
+            continue
+        fi
+        if (( candidate_size > best_size )); then
+            DISK="/dev/${candidate_name}"
+            best_size=$candidate_size
+        fi
+    done
+
+    if [[ -z "$DISK" ]]; then
+        IFS='|' read -r candidate_name candidate_size <<< "${candidates[0]}"
+        DISK="/dev/${candidate_name}"
+        best_size=$candidate_size
+    fi
+
+    DISK_SIZE_GB=$best_size
+    ok "disco sugerido para simulacion: ${DISK} (${DISK_SIZE_GB}GB)"
+}
+
+analyze_and_suggest() {
+    step "7/8 - Calculo de sugerencias como opcion 1"
+
+    if [[ -z "$DISK" ]]; then
+        warn "no hay disco sugerido; no se pueden calcular recomendaciones"
+        return 1
+    fi
+
+    RAM_GB="$(free -m 2>/dev/null | awk '/^Mem:/{print int($2/1024)}')"
+    [[ -z "$RAM_GB" ]] && RAM_GB=0
+
+    if [[ $DISK_SIZE_GB -lt 128 ]]; then
+        SUGGESTED_SYSTEM_PCT=90
+    elif [[ $DISK_SIZE_GB -lt 256 ]]; then
+        SUGGESTED_SYSTEM_PCT=85
+    else
+        SUGGESTED_SYSTEM_PCT=80
+    fi
+
+    SUGGESTED_SYSTEM_GB=$((DISK_SIZE_GB * SUGGESTED_SYSTEM_PCT / 100))
+    SUGGESTED_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - 1))
+    if (( SUGGESTED_BACKUP_GB <= 0 )); then
+        SUGGESTED_BACKUP_GB=0
+        CREATE_BACKUP="N"
+    else
+        CREATE_BACKUP="S"
+    fi
+
+    if [[ $RAM_GB -le 2 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (sistema con poca memoria)"
+    elif [[ $RAM_GB -le 8 ]]; then
+        SUGGESTED_SWAP="$((RAM_GB * 2))G"
+        SWAP_REASON="2x RAM (permite hibernacion)"
+    elif [[ $RAM_GB -le 16 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (permite hibernacion)"
+    else
+        SUGGESTED_SWAP="8G"
+        SWAP_REASON="8GB fijo (RAM suficiente)"
+    fi
+
+    if grep -qiE 'laptop|notebook' /sys/class/dmi/id/product_name 2>/dev/null; then
+        SUGGESTED_HOSTNAME="debian-laptop"
+    else
+        SUGGESTED_HOSTNAME="debian-pc"
+    fi
+
+    SUGGESTED_TIMEZONE="$(cat /etc/timezone 2>/dev/null || true)"
+    [[ -z "$SUGGESTED_TIMEZONE" ]] && SUGGESTED_TIMEZONE="UTC"
+
+    SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
+    [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
+
+    printf "[dry-run] disco objetivo sugerido: %s\n" "$DISK"
+    printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DISK_SIZE_GB"
+    printf "[dry-run] RAM usada para calculo: %sGB\n" "$RAM_GB"
+    printf "[dry-run] EFI recomendado: %s\n" "$SUGGESTED_EFI"
+    printf "[dry-run] Sistema recomendado: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
+    if [[ "$CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Backup recomendado: %sG\n" "$SUGGESTED_BACKUP_GB"
+    else
+        printf "[dry-run] Backup recomendado: no crear (sin espacio suficiente)\n"
+    fi
+    printf "[dry-run] Swapfile recomendado: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
+    printf "[dry-run] Hostname sugerido: %s\n" "$SUGGESTED_HOSTNAME"
+    printf "[dry-run] Timezone sugerido: %s\n" "$SUGGESTED_TIMEZONE"
+    printf "[dry-run] Locale sugerido: %s\n" "$SUGGESTED_LOCALE"
+    ok "recomendaciones calculadas con la misma base de opcion 1"
+}
+
 print_header() {
     printf "[dry-run] === DEBIAN BTRFS INSTALLER - DRY-RUN ANALYSIS ===\n"
     printf "[dry-run] repo: %s\n" "$REPO_ROOT"
@@ -111,7 +239,7 @@ print_header() {
 }
 
 check_environment() {
-    step "3/7 - Validaciones de entorno"
+    step "3/8 - Validaciones de entorno"
 
     if ! have_cmd bash; then
         fail "bash no disponible"
@@ -150,7 +278,7 @@ check_environment() {
 }
 
 detect_runtime_context() {
-    step "4/7 - Contexto de ejecucion"
+    step "4/8 - Contexto de ejecucion"
 
     local kernel user uid_value root_fs root_src
     kernel="$(uname -sr 2>/dev/null || echo desconocido)"
@@ -175,7 +303,7 @@ detect_runtime_context() {
 }
 
 verify_disk_space() {
-    step "5/7 - Verificacion de espacio en disco"
+    step "5/8 - Verificacion de espacio en disco"
 
     if ! have_cmd df; then
         warn "df no disponible; verificacion saltada"
@@ -204,7 +332,7 @@ verify_disk_space() {
 }
 
 detect_storage() {
-    step "6/7 - Deteccion de hardware y particiones"
+    step "6/8 - Deteccion de hardware y particiones"
 
     if ! have_cmd lsblk; then
         warn "omitiendo deteccion de discos porque lsblk no esta disponible"
@@ -229,10 +357,12 @@ detect_storage() {
 
     printf "[dry-run] particiones btrfs detectadas: %s\n" "$btrfs_parts"
     printf "[dry-run] particiones EFI detectadas (aprox): %s\n" "$efi_parts"
+
+    detect_suggested_disk || true
 }
 
 print_preview_plan() {
-    step "7/7 - Preview de acciones (simuladas)"
+    step "8/8 - Resultado simulado si aceptaras los recomendados"
 
     cat <<'EOF'
 [dry-run] que se haria en instalacion real:
@@ -244,23 +374,32 @@ print_preview_plan() {
 [dry-run]   6) validar arranque y preparar rollback.
 EOF
 
-    cat <<'EOF'
+    printf "\n[dry-run] simulacion de resultado esperado (informativo):\n"
+    printf "[dry-run]   supuesto: en opcion 1 aceptas ENTER sobre las sugerencias.\n"
+    printf "[dry-run]   disco elegido por defecto: %s\n" "$DISK"
+    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
+    printf "[dry-run]   particion 2: SISTEMA   %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
+    if [[ "$CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
+    else
+        printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
+    fi
 
-[dry-run] simulacion de resultado esperado (informativo):
-[dry-run]   supuesto: disco dedicado para Debian, esquema limpio.
-[dry-run]   particion 1: EFI       512MiB   FAT32   /boot/efi
-[dry-run]   particion 2: ROOT      resto    BTRFS   /
+    cat <<'EOF'
 [dry-run]
 [dry-run]   subvolumenes propuestos dentro de BTRFS:
 [dry-run]     - @           -> raiz del sistema
 [dry-run]     - @home       -> datos de usuario
 [dry-run]     - @snapshots  -> base sugerida para snapshots
+[dry-run]     - @swap       -> contenedor del swapfile
 [dry-run]
 [dry-run]   montaje esperado:
 [dry-run]     - /           -> subvol=@
 [dry-run]     - /home       -> subvol=@home
 [dry-run]     - /.snapshots -> subvol=@snapshots
 EOF
+
+    printf "[dry-run]     - /var/swap   -> subvol=@swap (swapfile %s)\n" "$SUGGESTED_SWAP"
 
     cat <<'EOF'
 [dry-run] comandos de referencia (no ejecutados):
@@ -286,6 +425,8 @@ main() {
     verify_disk_space
     printf "\n"
     detect_storage
+    printf "\n"
+    analyze_and_suggest
     printf "\n"
     print_preview_plan
 
