@@ -9,7 +9,8 @@ set -euo pipefail
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
 # - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
 # - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - OK
-# - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - Pendiente validacion
+# - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
+# - 0008.0005 - Mostrar plan detallado del dry-run antes de ejecutar - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -388,15 +389,24 @@ run_with_progress() {
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
-        "Modo prueba - primera parte"
+        "Modo prueba - analisis del sistema"
         ""
-        "Se va a ejecutar el script dedicado de la opcion 2:"
+        "Este flujo NO toca disco y muestra primero:"
+        "  1) Analisis de memoria"
+        "  2) Analisis de CPU"
+        "  3) Validaciones de entorno"
+        "  4) Contexto de ejecucion"
+        "  5) Espacio en disco"
+        "  6) Hardware y particiones"
+        "  7) Preview de acciones"
+        ""
+        "Script ejecutado para el analisis:"
         "  ${OPTION2_SCRIPT}"
         ""
-        "Esta prueba NO toca disco."
+        "Resultado esperado: informe completo del estado actual."
     )
 
-    show_info_box "DRY-RUN | PARTE 1" precheck_lines "ENTER/Esc/q: continuar" "normal"
+    show_info_box "DRY-RUN | DIAGNOSTICO" precheck_lines "ENTER/Esc/q: continuar" "wide-log"
 
     if [[ ! -f "$option2_path" ]]; then
         local missing_lines=(
@@ -409,16 +419,16 @@ run_dryrun_part1() {
         return 1
     fi
 
-    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar opcion 2 (primera parte) ahora?" 0; then
+    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar opcion 2 (diagnostico completo) ahora?" 0; then
         return 0
     fi
 
-    if run_with_progress "DRY-RUN | PARTE 1" "bash \"$option2_path\"" "Opcion 2 parte 1 completada." "Opcion 2 parte 1 fallo."; then
+    if run_with_progress "DRY-RUN | DIAGNOSTICO" "bash \"$option2_path\"" "Analisis de opcion 2 completado." "Analisis de opcion 2 fallo."; then
         local ok_lines=(
-            "Primera parte completada."
+            "Diagnostico completado."
             ""
-            "Siguiente paso: ampliar el script de opcion 2"
-            "con flujo dry-run completo."
+            "Siguiente paso (0008.0005):"
+            "interactividad de seleccion de disco y esquema."
         )
         show_success_box ok_lines
     fi

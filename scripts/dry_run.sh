@@ -33,7 +33,7 @@ have_cmd() {
 }
 
 analyze_memory() {
-    step "1/7 - Analisis de memoria\n"
+    step "1/7 - Analisis de memoria"
 
     if [[ ! -f /proc/meminfo ]]; then
         warn "no se puede leer /proc/meminfo"
@@ -75,7 +75,7 @@ analyze_memory() {
 }
 
 analyze_cpu() {
-    step "2/7 - Analisis de CPU\n"
+    step "2/7 - Analisis de CPU"
 
     if [[ ! -f /proc/cpuinfo ]]; then
         warn "no se puede leer /proc/cpuinfo"
