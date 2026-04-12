@@ -57,6 +57,11 @@ Documenta lo completado, en progreso y lo proyectado.
 - La instalación debe contar con salida a Internet, preferentemente por Ethernet
 - Si el live arranca solo con Wi-Fi, queda fuera del alcance validado de esta iteración
 
+### 0008.0010 - Preguntas faltantes (pendiente validación)
+- Agregar en 008 las preguntas de identidad y bloque APT/software que existen en 005/006/007
+- Ordenarlas con criterio Debian: identidad antes de particionado, APT/software después
+- Mantener formato Sugerido --> / Elegido --> en resumen e informe dry-run
+
 ---
 
 ## Estructura General del Menú
@@ -205,9 +210,9 @@ bash scripts/008_debian-btrfs-installer.sh
 | aa66817 | 0008.0008 | Resumen con formato Sugerido/Elegido |
 | 8509282 | 0008.0008 | Prompt de Backup con formato `[S/n]` |
 | bd6166e | 0008.0008 | Limpieza del informe UI en `dry_run.sh` |
-| (actual) | 0008.0009-OK | Red cerrada como requisito de Internet/Ethernet |
+| (actual) | 0008.0010 | Integración de preguntas faltantes en flujo 008 |
 | 92417ca | - | README.md bitácora inicial |
-| (próximo) | - | Definir siguiente iteración funcional |
+| (próximo) | 0008.0010-OK | Validación en VM y cierre de iteración |
 
 ---
 

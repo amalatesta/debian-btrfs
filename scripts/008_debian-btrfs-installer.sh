@@ -15,6 +15,7 @@ set -euo pipefail
 # - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - OK
 # - 0008.0008 - Preguntas iniciales tipo Debian (locale/teclado/timezone) - OK
 # - 0008.0009 - Red cerrada como requisito: salida a Internet preferentemente por Ethernet - OK
+# - 0008.0010 - Completar preguntas faltantes (identidad + APT/software) con orden Debian - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -57,6 +58,19 @@ DRYRUN_SELECTED_SWAP=""
 DRYRUN_SELECTED_LOCALE=""
 DRYRUN_SELECTED_KEYBOARD=""
 DRYRUN_SELECTED_TIMEZONE=""
+DRYRUN_SELECTED_HOSTNAME=""
+DRYRUN_SELECTED_USERNAME=""
+DRYRUN_SELECTED_USER_PASSWORD_SET="N"
+DRYRUN_SELECTED_APT_ENABLE_NONFREE="S"
+DRYRUN_SELECTED_APT_ENABLE_SECURITY="S"
+DRYRUN_SELECTED_APT_ENABLE_UPDATES="S"
+DRYRUN_SELECTED_APT_ENABLE_DEBSRC="N"
+DRYRUN_SELECTED_APT_PROXY=""
+DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE="S"
+DRYRUN_SELECTED_ENABLE_POPCON="N"
+DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE="POSTBOOT"
+DRYRUN_SELECTED_INSTALL_SSH_IN_BASE="S"
+DRYRUN_SELECTED_INSTALL_TASKSEL_NOW="N"
 
 C_RESET=""
 C_BORDER=""
@@ -552,10 +566,23 @@ ask_efi_in_plain_terminal() {
     local location_choice=""
     local keyboard_value="" suggested_keyboard=""
     local timezone_value="" suggested_timezone=""
+    local hostname_value="" suggested_hostname=""
+    local username_value="usuario" suggested_username="usuario"
+    local user_password_set="N" suggested_user_password_set="N"
     local efi_size="" suggested_efi=""
     local system_size="" suggested_system=""
     local create_backup="" suggested_backup=""
     local swap_size="" suggested_swap=""
+    local apt_enable_nonfree="S" suggested_apt_enable_nonfree="S"
+    local apt_enable_security="S" suggested_apt_enable_security="S"
+    local apt_enable_updates="S" suggested_apt_enable_updates="S"
+    local apt_enable_debsrc="N" suggested_apt_enable_debsrc="N"
+    local apt_proxy="" suggested_apt_proxy=""
+    local install_nonfree_firmware="S" suggested_install_nonfree_firmware="S"
+    local enable_popcon="N" suggested_enable_popcon="N"
+    local software_install_mode="POSTBOOT" suggested_software_install_mode="POSTBOOT"
+    local install_ssh_in_base="S" suggested_install_ssh_in_base="S"
+    local install_tasksel_now="N" suggested_install_tasksel_now="N"
     local defaults_output key value
     local default_efi="1G"
     local default_system="64G"
@@ -565,6 +592,7 @@ ask_efi_in_plain_terminal() {
     local default_timezone="UTC"
     local default_keyboard="us"
     local default_keyboard_source="heuristica"
+    local default_hostname="debian-pc"
     local run_keyboard_selector=""
     local quick_keyboard_choice=""
     local install_temp_tools=""
@@ -583,6 +611,7 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_TIMEZONE) default_timezone="$value" ;;
             DRYRUN_DEFAULT_KEYBOARD) default_keyboard="$value" ;;
             DRYRUN_DEFAULT_KEYBOARD_SOURCE) default_keyboard_source="$value" ;;
+            DRYRUN_DEFAULT_HOSTNAME) default_hostname="$value" ;;
         esac
     done <<< "$defaults_output"
 
@@ -776,6 +805,29 @@ ask_efi_in_plain_terminal() {
     timezone_value="${timezone_value:-$default_timezone}"
     DRYRUN_SELECTED_TIMEZONE="$timezone_value"
 
+    suggested_hostname="$default_hostname"
+    clear > /dev/tty
+    printf "\n[dry-run] identidad del sistema:\n\n" > /dev/tty
+    read -r -p "Hostname [${default_hostname}] : " hostname_value < /dev/tty
+    hostname_value="${hostname_value:-$default_hostname}"
+    DRYRUN_SELECTED_HOSTNAME="$hostname_value"
+
+    clear > /dev/tty
+    printf "\n[dry-run] usuario principal (simulacion):\n\n" > /dev/tty
+    read -r -p "Nombre de usuario [usuario] : " username_value < /dev/tty
+    username_value="${username_value:-usuario}"
+    DRYRUN_SELECTED_USERNAME="$username_value"
+
+    clear > /dev/tty
+    printf "\n[dry-run] password de usuario:\n\n" > /dev/tty
+    read -r -p "Password definida para ${username_value}? [S/n]: " user_password_set < /dev/tty
+    user_password_set="${user_password_set:-S}"
+    user_password_set="${user_password_set^^}"
+    if [[ "$user_password_set" != "S" ]]; then
+        user_password_set="N"
+    fi
+    DRYRUN_SELECTED_USER_PASSWORD_SET="$user_password_set"
+
     clear > /dev/tty
     printf "\n[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
     read -r -p "Tamano EFI [${default_efi}] : " efi_size < /dev/tty
@@ -805,6 +857,89 @@ ask_efi_in_plain_terminal() {
     DRYRUN_SELECTED_BACKUP="$create_backup"
 
     clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Habilitar software no libre? [S/n]: " apt_enable_nonfree < /dev/tty
+    apt_enable_nonfree="${apt_enable_nonfree:-S}"
+    apt_enable_nonfree="${apt_enable_nonfree^^}"
+    [[ "$apt_enable_nonfree" != "S" ]] && apt_enable_nonfree="N"
+    DRYRUN_SELECTED_APT_ENABLE_NONFREE="$apt_enable_nonfree"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Habilitar repositorio security? [S/n]: " apt_enable_security < /dev/tty
+    apt_enable_security="${apt_enable_security:-S}"
+    apt_enable_security="${apt_enable_security^^}"
+    [[ "$apt_enable_security" != "S" ]] && apt_enable_security="N"
+    DRYRUN_SELECTED_APT_ENABLE_SECURITY="$apt_enable_security"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Habilitar repositorio updates? [S/n]: " apt_enable_updates < /dev/tty
+    apt_enable_updates="${apt_enable_updates:-S}"
+    apt_enable_updates="${apt_enable_updates^^}"
+    [[ "$apt_enable_updates" != "S" ]] && apt_enable_updates="N"
+    DRYRUN_SELECTED_APT_ENABLE_UPDATES="$apt_enable_updates"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Incluir deb-src? [s/N]: " apt_enable_debsrc < /dev/tty
+    apt_enable_debsrc="${apt_enable_debsrc:-N}"
+    apt_enable_debsrc="${apt_enable_debsrc^^}"
+    [[ "$apt_enable_debsrc" != "S" ]] && apt_enable_debsrc="N"
+    DRYRUN_SELECTED_APT_ENABLE_DEBSRC="$apt_enable_debsrc"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Proxy HTTP para APT [vacio=sin proxy]: " apt_proxy < /dev/tty
+    DRYRUN_SELECTED_APT_PROXY="$apt_proxy"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Instalar firmware no libre (si aplica)? [S/n]: " install_nonfree_firmware < /dev/tty
+    install_nonfree_firmware="${install_nonfree_firmware:-S}"
+    install_nonfree_firmware="${install_nonfree_firmware^^}"
+    [[ "$install_nonfree_firmware" != "S" ]] && install_nonfree_firmware="N"
+    DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE="$install_nonfree_firmware"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Participar en popularity-contest? [s/N]: " enable_popcon < /dev/tty
+    enable_popcon="${enable_popcon:-N}"
+    enable_popcon="${enable_popcon^^}"
+    [[ "$enable_popcon" != "S" ]] && enable_popcon="N"
+    DRYRUN_SELECTED_ENABLE_POPCON="$enable_popcon"
+
+    clear > /dev/tty
+    printf "\n[dry-run] modo de software base:\n" > /dev/tty
+    printf "[dry-run]   1) AUTO\n" > /dev/tty
+    printf "[dry-run]   2) INTERACTIVE\n" > /dev/tty
+    printf "[dry-run]   3) POSTBOOT\n\n" > /dev/tty
+    read -r -p "Opcion [3]: " software_install_mode < /dev/tty
+    software_install_mode="${software_install_mode:-3}"
+    case "$software_install_mode" in
+        1|AUTO|auto) software_install_mode="AUTO" ;;
+        2|INTERACTIVE|interactive) software_install_mode="INTERACTIVE" ;;
+        *) software_install_mode="POSTBOOT" ;;
+    esac
+    DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE="$software_install_mode"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Instalar SSH en la base? [S/n]: " install_ssh_in_base < /dev/tty
+    install_ssh_in_base="${install_ssh_in_base:-S}"
+    install_ssh_in_base="${install_ssh_in_base^^}"
+    [[ "$install_ssh_in_base" != "S" ]] && install_ssh_in_base="N"
+    DRYRUN_SELECTED_INSTALL_SSH_IN_BASE="$install_ssh_in_base"
+
+    clear > /dev/tty
+    printf "\n[dry-run] preguntas no criticas (APT/software):\n\n" > /dev/tty
+    read -r -p "Instalar tasksel ahora? [s/N]: " install_tasksel_now < /dev/tty
+    install_tasksel_now="${install_tasksel_now:-N}"
+    install_tasksel_now="${install_tasksel_now^^}"
+    [[ "$install_tasksel_now" != "S" ]] && install_tasksel_now="N"
+    DRYRUN_SELECTED_INSTALL_TASKSEL_NOW="$install_tasksel_now"
+
+    clear > /dev/tty
     printf "\n[dry-run] RESUMEN DE CONFIGURACION:\n\n" > /dev/tty
     printf "[dry-run] === SISTEMA ===\n" > /dev/tty
     printf "[dry-run] Idioma:\n" > /dev/tty
@@ -819,6 +954,16 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] Timezone:\n" > /dev/tty
     printf "[dry-run]   Sugerido --> %s\n" "$suggested_timezone" > /dev/tty
     printf "[dry-run]   Elegido  --> %s\n" "$timezone_value" > /dev/tty
+    printf "\n[dry-run] === IDENTIDAD ===\n" > /dev/tty
+    printf "[dry-run] Hostname:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_hostname" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$hostname_value" > /dev/tty
+    printf "[dry-run] Usuario:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_username" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$username_value" > /dev/tty
+    printf "[dry-run] Password usuario:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_user_password_set" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$user_password_set" > /dev/tty
     printf "\n[dry-run] === PARTICIONES ===\n" > /dev/tty
     printf "[dry-run] EFI:\n" > /dev/tty
     printf "[dry-run]   Sugerido --> %s\n" "$suggested_efi" > /dev/tty
@@ -832,6 +977,37 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] Backup:\n" > /dev/tty
     printf "[dry-run]   Sugerido --> %s\n" "$suggested_backup" > /dev/tty
     printf "[dry-run]   Elegido  --> %s\n" "$create_backup" > /dev/tty
+    printf "\n[dry-run] === APT / SOFTWARE ===\n" > /dev/tty
+    printf "[dry-run] non-free:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_apt_enable_nonfree" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$apt_enable_nonfree" > /dev/tty
+    printf "[dry-run] security:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_apt_enable_security" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$apt_enable_security" > /dev/tty
+    printf "[dry-run] updates:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_apt_enable_updates" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$apt_enable_updates" > /dev/tty
+    printf "[dry-run] deb-src:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_apt_enable_debsrc" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$apt_enable_debsrc" > /dev/tty
+    printf "[dry-run] Proxy APT:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "${suggested_apt_proxy:-<sin proxy>}" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "${apt_proxy:-<sin proxy>}" > /dev/tty
+    printf "[dry-run] Firmware no libre:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_install_nonfree_firmware" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$install_nonfree_firmware" > /dev/tty
+    printf "[dry-run] popularity-contest:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_enable_popcon" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$enable_popcon" > /dev/tty
+    printf "[dry-run] Modo software:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_software_install_mode" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$software_install_mode" > /dev/tty
+    printf "[dry-run] SSH en base:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_install_ssh_in_base" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$install_ssh_in_base" > /dev/tty
+    printf "[dry-run] tasksel ahora:\n" > /dev/tty
+    printf "[dry-run]   Sugerido --> %s\n" "$suggested_install_tasksel_now" > /dev/tty
+    printf "[dry-run]   Elegido  --> %s\n" "$install_tasksel_now" > /dev/tty
     printf "\n[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
 
@@ -874,17 +1050,21 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_LOCALE=\"$DRYRUN_SELECTED_LOCALE\" DRYRUN_KEYBOARD=\"$DRYRUN_SELECTED_KEYBOARD\" DRYRUN_TIMEZONE=\"$DRYRUN_SELECTED_TIMEZONE\" DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_SWAP_SIZE=\"$DRYRUN_SELECTED_SWAP\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_LOCALE=\"$DRYRUN_SELECTED_LOCALE\" DRYRUN_KEYBOARD=\"$DRYRUN_SELECTED_KEYBOARD\" DRYRUN_TIMEZONE=\"$DRYRUN_SELECTED_TIMEZONE\" DRYRUN_HOSTNAME=\"$DRYRUN_SELECTED_HOSTNAME\" DRYRUN_USERNAME=\"$DRYRUN_SELECTED_USERNAME\" DRYRUN_USER_PASSWORD_SET=\"$DRYRUN_SELECTED_USER_PASSWORD_SET\" DRYRUN_APT_ENABLE_NONFREE=\"$DRYRUN_SELECTED_APT_ENABLE_NONFREE\" DRYRUN_APT_ENABLE_SECURITY=\"$DRYRUN_SELECTED_APT_ENABLE_SECURITY\" DRYRUN_APT_ENABLE_UPDATES=\"$DRYRUN_SELECTED_APT_ENABLE_UPDATES\" DRYRUN_APT_ENABLE_DEBSRC=\"$DRYRUN_SELECTED_APT_ENABLE_DEBSRC\" DRYRUN_APT_PROXY=\"$DRYRUN_SELECTED_APT_PROXY\" DRYRUN_INSTALL_NONFREE_FIRMWARE=\"$DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE\" DRYRUN_ENABLE_POPCON=\"$DRYRUN_SELECTED_ENABLE_POPCON\" DRYRUN_SOFTWARE_INSTALL_MODE=\"$DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE\" DRYRUN_INSTALL_SSH_IN_BASE=\"$DRYRUN_SELECTED_INSTALL_SSH_IN_BASE\" DRYRUN_INSTALL_TASKSEL_NOW=\"$DRYRUN_SELECTED_INSTALL_TASKSEL_NOW\" DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_SWAP_SIZE=\"$DRYRUN_SELECTED_SWAP\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
             "Locale elegido para la simulacion: $DRYRUN_SELECTED_LOCALE"
             "Teclado elegido para la simulacion: $DRYRUN_SELECTED_KEYBOARD"
             "Timezone elegida para la simulacion: $DRYRUN_SELECTED_TIMEZONE"
+            "Hostname elegido para la simulacion: $DRYRUN_SELECTED_HOSTNAME"
+            "Usuario elegido para la simulacion: $DRYRUN_SELECTED_USERNAME"
             "EFI elegido para la simulacion: $DRYRUN_SELECTED_EFI"
             "Sistema elegido para la simulacion: $DRYRUN_SELECTED_SYSTEM"
             "Swap elegido para la simulacion: $DRYRUN_SELECTED_SWAP"
             "Crear backup: $DRYRUN_SELECTED_BACKUP"
+            "SSH en base: $DRYRUN_SELECTED_INSTALL_SSH_IN_BASE"
+            "Modo software: $DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE"
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
         )
