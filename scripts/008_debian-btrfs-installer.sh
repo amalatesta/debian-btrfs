@@ -1133,6 +1133,7 @@ ask_disk_password_in_plain_terminal() {
 
 run_install_part1() {
     local option1_path="${SCRIPT_DIR}/${OPTION1_SCRIPT}"
+    local defaults_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
         "Instalacion real de Debian"
         ""
@@ -1158,12 +1159,23 @@ run_install_part1() {
         return 1
     fi
 
+    if [[ ! -f "$defaults_path" ]]; then
+        local missing_defaults_lines=(
+            "No se encontro el archivo de defaults:"
+            "$OPTION2_SCRIPT"
+            ""
+            "Se requiere para el flujo de preguntas inicial."
+        )
+        show_error_box missing_defaults_lines
+        return 1
+    fi
+
     if ! confirm_yes_no "CONFIRMAR" "Iniciar el flujo de preguntas?" 0; then
         return 0
     fi
 
     # Recolectar decisiones comunes (mismo flujo que dry-run)
-    if ! ask_efi_in_plain_terminal "$option1_path"; then
+    if ! ask_efi_in_plain_terminal "$defaults_path"; then
         return 0
     fi
 
