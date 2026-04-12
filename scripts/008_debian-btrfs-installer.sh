@@ -10,7 +10,8 @@ set -euo pipefail
 # - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
 # - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - OK
 # - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
-# - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - Pendiente validacion
+# - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - OK
+# - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -331,6 +332,57 @@ show_command_preview() {
     show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu" "wide-log"
 }
 
+prompt_text_input() {
+    local title="$1"
+    local prompt="$2"
+    local default_value="$3"
+    local profile="${4:-compact}"
+    local value="$default_value"
+    local input_key rest
+
+    while true; do
+        local INPUT_LINES=(
+            "$prompt"
+            ""
+            "Valor sugerido editable:"
+            "$value"
+            ""
+            "ENTER acepta el valor mostrado."
+        )
+
+        show_info_box "$title" INPUT_LINES "Escribir | Backspace: borrar | ENTER: aceptar | Esc/q: cancelar" "$profile"
+
+        IFS= read -rsn1 input_key || true
+
+        if [[ -z "${input_key:-}" ]]; then
+            printf '%s\n' "$value"
+            return 0
+        fi
+
+        case "$input_key" in
+            $'\x1b')
+                IFS= read -rsn2 rest || true
+                return 1
+                ;;
+            $'\177'|$'\b'|$'\x08')
+                value="${value%?}"
+                ;;
+            q|Q)
+                return 1
+                ;;
+            $'\n'|$'\r')
+                printf '%s\n' "$value"
+                return 0
+                ;;
+            *)
+                if [[ "$input_key" =~ [[:print:]] ]]; then
+                    value+="$input_key"
+                fi
+                ;;
+        esac
+    done
+}
+
 confirm_yes_no() {
     local title="$1"
     local prompt="$2"
@@ -403,7 +455,7 @@ run_with_report() {
         REPORT_LINES=("Sin salida generada por el comando.")
     fi
 
-    show_info_box "$title" REPORT_LINES "Up/Down/PgUp/PgDn: scroll | ENTER/Esc/q: cerrar" "wide-log"
+    show_info_box "$title" REPORT_LINES "ENTER/Esc/q: cerrar" "wide-log"
 
     local RESULT_LINES=(
         "Comando ejecutado:"
@@ -428,14 +480,16 @@ run_with_report() {
 
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
+    local efi_size
     local precheck_lines=(
         "Modo prueba (dry-run)"
         ""
         "Se ejecutara un script externo de diagnostico:"
         "  ${OPTION2_SCRIPT}"
         ""
-        "Se mostrara el informe completo dentro de esta UI."
-        "Usar scroll para recorrer el relevamiento y la simulacion."
+        "Se hara una simulacion de la opcion 1 sin aplicar cambios."
+        "Primero se preguntara una configuracion sugerida y luego se mostrara"
+        "el informe final completo dentro de esta UI."
     )
 
     show_info_box "DRY-RUN" precheck_lines "ENTER/Esc/q: continuar" "normal"
@@ -455,10 +509,15 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if ! efi_size="$(prompt_text_input "SIMULACION | EFI" "Tamaño de EFI (ej: 1G)" "1G" "compact")"; then
+        return 0
+    fi
+
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$efi_size\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
+            "EFI elegido para la simulacion: $efi_size"
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
         )

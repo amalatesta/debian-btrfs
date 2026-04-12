@@ -20,6 +20,9 @@ SUGGESTED_TIMEZONE=""
 SUGGESTED_LOCALE=""
 SUGGESTED_HOSTNAME="debian-pc"
 CREATE_BACKUP="S"
+SELECTED_EFI_SIZE=""
+SELECTED_EFI_GB=1
+EFFECTIVE_BACKUP_GB=0
 
 step() {
     printf "\n[dry-run][step] %s\n" "$1"
@@ -44,6 +47,24 @@ info() {
 
 have_cmd() {
     command -v "$1" >/dev/null 2>&1
+}
+
+normalize_size_gib() {
+    local raw="$1"
+    raw="${raw// /}"
+    raw="${raw^^}"
+    [[ -z "$raw" ]] && raw="1G"
+    if [[ "$raw" =~ ^[0-9]+$ ]]; then
+        raw="${raw}G"
+    fi
+    printf '%s\n' "$raw"
+}
+
+size_gib_to_int() {
+    local raw="$1"
+    raw="$(normalize_size_gib "$raw")"
+    raw="${raw%G}"
+    printf '%s\n' "$raw"
 }
 
 analyze_memory() {
@@ -213,15 +234,31 @@ analyze_and_suggest() {
     SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
     [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
 
+    SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$SUGGESTED_EFI}")"
+    SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
+    if (( SELECTED_EFI_GB < 1 )); then
+        SELECTED_EFI_SIZE="$SUGGESTED_EFI"
+        SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
+    fi
+
+    EFFECTIVE_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - SELECTED_EFI_GB))
+    if (( EFFECTIVE_BACKUP_GB <= 0 )); then
+        EFFECTIVE_BACKUP_GB=0
+        CREATE_BACKUP="N"
+    else
+        CREATE_BACKUP="S"
+    fi
+
     printf "[dry-run] disco objetivo sugerido: %s\n" "$DISK"
     printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DISK_SIZE_GB"
     printf "[dry-run] RAM usada para calculo: %sGB\n" "$RAM_GB"
     printf "[dry-run] EFI recomendado: %s\n" "$SUGGESTED_EFI"
+    printf "[dry-run] EFI elegido en simulacion: %s\n" "$SELECTED_EFI_SIZE"
     printf "[dry-run] Sistema recomendado: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
     if [[ "$CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run] Backup recomendado: %sG\n" "$SUGGESTED_BACKUP_GB"
+        printf "[dry-run] Backup resultante con EFI elegido: %sG\n" "$EFFECTIVE_BACKUP_GB"
     else
-        printf "[dry-run] Backup recomendado: no crear (sin espacio suficiente)\n"
+        printf "[dry-run] Backup resultante: no crear (sin espacio suficiente)\n"
     fi
     printf "[dry-run] Swapfile recomendado: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
     printf "[dry-run] Hostname sugerido: %s\n" "$SUGGESTED_HOSTNAME"
@@ -377,10 +414,10 @@ EOF
     printf "\n[dry-run] simulacion de resultado esperado (informativo):\n"
     printf "[dry-run]   supuesto: en opcion 1 aceptas ENTER sobre las sugerencias.\n"
     printf "[dry-run]   disco elegido por defecto: %s\n" "$DISK"
-    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
+    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
     printf "[dry-run]   particion 2: SISTEMA   %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
     if [[ "$CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
+        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
     else
         printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
     fi
