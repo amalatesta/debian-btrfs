@@ -297,6 +297,9 @@ run_theme_selector() {
     local selected_theme=2
     local key
 
+    # El selector inicial se muestra siempre en blanco.
+    apply_theme "white"
+
     while true; do
         draw_theme_ui "$selected_theme"
         key="$(get_key)"
