@@ -2,55 +2,7 @@
 set -euo pipefail
 
 # Smoke test UI en bash+tput (sin whiptail).
-# Objetivo: probar look tipo dialog y flujo de foco:
-# - ENTER sobre lista mueve foco a botones
-# - ENTER en Aceptar confirma opcion
-
-if [[ ! -t 0 || ! -t 1 ]]; then
-    echo "ERROR: Este test requiere una terminal interactiva (TTY)."
-    exit 1
-fi
-
-stty -echo -icanon min 1 time 0
-
-cleanup() {
-    stty sane 2>/dev/null || true
-    tput sgr0 2>/dev/null || true
-    tput cnorm 2>/dev/null || true
-    clear
-}
-trap cleanup EXIT INT TERM
-
-tput civis
-
-# Paleta simple con fallback si la terminal no soporta color.
-if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
-    C_RESET="$(tput sgr0)"
-    # Verde "fosforo": usa verde brillante ANSI cuando hay >=16 colores.
-    if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
-        C_GREEN="$(printf '\033[92m')"
-        C_BG_GREEN="$(printf '\033[102m')"
-    else
-        C_GREEN="$(tput setaf 2)"
-        C_BG_GREEN="$(tput setab 2)"
-    fi
-    C_BORDER="${C_GREEN}"
-    C_TITLE="$(tput bold)${C_GREEN}"
-    C_PROMPT="${C_GREEN}"
-    C_TEXT="${C_GREEN}"
-    C_HELP="${C_GREEN}"
-    C_OPT_NORMAL="${C_GREEN}"
-    C_FOCUS="$(tput setaf 0)${C_BG_GREEN}"
-else
-    C_RESET=""
-    C_BORDER=""
-    C_TITLE=""
-    C_PROMPT=""
-    C_TEXT=""
-    C_HELP=""
-    C_OPT_NORMAL=""
-    C_FOCUS=""
-fi
+# Base modular para reutilizar en 008.
 
 TITLE="Test UI bash+tput"
 PROMPT="Selecciona una opcion:"
@@ -69,12 +21,85 @@ confirm_armed=0
 exit_requested=0
 result=""
 
+BOX_W=76
+BOX_H=18
+START_COL=0
+START_ROW=0
+
+C_RESET=""
+C_BORDER=""
+C_TITLE=""
+C_PROMPT=""
+C_TEXT=""
+C_HELP=""
+C_OPT_NORMAL=""
+C_FOCUS=""
+
+ensure_tty() {
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        echo "ERROR: Este test requiere una terminal interactiva (TTY)."
+        exit 1
+    fi
+}
+
+setup_terminal() {
+    stty -echo -icanon min 1 time 0
+    tput civis
+}
+
+restore_terminal() {
+    stty sane 2>/dev/null || true
+    tput sgr0 2>/dev/null || true
+    tput cnorm 2>/dev/null || true
+}
+
+cleanup() {
+    restore_terminal
+    clear
+}
+
+init_palette() {
+    if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
+        C_RESET="$(tput sgr0)"
+        if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
+            C_GREEN="$(printf '\033[92m')"
+            C_BG_GREEN="$(printf '\033[102m')"
+        else
+            C_GREEN="$(tput setaf 2)"
+            C_BG_GREEN="$(tput setab 2)"
+        fi
+        C_BORDER="${C_GREEN}"
+        C_TITLE="$(tput bold)${C_GREEN}"
+        C_PROMPT="${C_GREEN}"
+        C_TEXT="${C_GREEN}"
+        C_HELP="${C_GREEN}"
+        C_OPT_NORMAL="${C_GREEN}"
+        C_FOCUS="$(tput setaf 0)${C_BG_GREEN}"
+    fi
+}
+
+calc_layout() {
+    local cols lines
+    cols="$(tput cols)"
+    lines="$(tput lines)"
+
+    BOX_W=76
+    BOX_H=18
+
+    (( BOX_W > cols - 2 )) && BOX_W=$((cols - 2))
+    (( BOX_H > lines - 2 )) && BOX_H=$((lines - 2))
+    (( BOX_W < 50 )) && BOX_W=50
+    (( BOX_H < 14 )) && BOX_H=14
+
+    START_COL=$(( (cols - BOX_W) / 2 ))
+    START_ROW=$(( (lines - BOX_H) / 2 ))
+}
+
 get_key() {
     local k rest
     IFS= read -rsn1 k || true
 
     if [[ -z "${k:-}" ]]; then
-        # En este modo de lectura, ENTER puede llegar como cadena vacia.
         echo "ENTER"
         return 0
     fi
@@ -94,7 +119,6 @@ get_key() {
 
     case "$k" in
         $'\t') echo "TAB" ;;
-        "") echo "ENTER" ;;
         $'\n'|$'\r') echo "ENTER" ;;
         q|Q) echo "QUIT" ;;
         *) echo "OTHER" ;;
@@ -113,104 +137,104 @@ draw_box_line() {
     printf "%s" "$C_RESET"
 }
 
-draw_ui() {
-    local cols lines box_w box_h start_col start_row
-    cols="$(tput cols)"
-    lines="$(tput lines)"
-
-    box_w=76
-    box_h=18
-
-    (( box_w > cols - 2 )) && box_w=$((cols - 2))
-    (( box_h > lines - 2 )) && box_h=$((lines - 2))
-    (( box_w < 50 )) && box_w=50
-    (( box_h < 14 )) && box_h=14
-
-    start_col=$(( (cols - box_w) / 2 ))
-    start_row=$(( (lines - box_h) / 2 ))
-
-    clear
-
-    draw_box_line "$start_row" "$start_col" "$box_w"
-
+draw_frame() {
     local i
-    for ((i = 1; i < box_h - 1; i++)); do
-        tput cup $((start_row + i)) "$start_col"
-        printf "%s" "$C_BORDER"
-        printf "|"
-        tput cup $((start_row + i)) $((start_col + box_w - 1))
-        printf "|"
-        printf "%s" "$C_RESET"
+    draw_box_line "$START_ROW" "$START_COL" "$BOX_W"
+    for ((i = 1; i < BOX_H - 1; i++)); do
+        tput cup $((START_ROW + i)) "$START_COL"
+        printf "%s|%s" "$C_BORDER" "$C_RESET"
+        tput cup $((START_ROW + i)) $((START_COL + BOX_W - 1))
+        printf "%s|%s" "$C_BORDER" "$C_RESET"
     done
+    draw_box_line $((START_ROW + BOX_H - 1)) "$START_COL" "$BOX_W"
+}
 
-    draw_box_line $((start_row + box_h - 1)) "$start_col" "$box_w"
+draw_header() {
+    tput cup $((START_ROW + 1)) $((START_COL + 2))
+    printf "%s%s%s" "$C_TITLE" "$TITLE" "$C_RESET"
 
-    tput cup $((start_row + 1)) $((start_col + 2))
-    printf "%s" "$C_TITLE"
-    printf "%s" "$TITLE"
-    printf "%s" "$C_RESET"
+    tput cup $((START_ROW + 3)) $((START_COL + 2))
+    printf "%s%s%s" "$C_PROMPT" "$PROMPT" "$C_RESET"
+}
 
-    tput cup $((start_row + 3)) $((start_col + 2))
-    printf "%s" "$C_PROMPT"
-    printf "%s" "$PROMPT"
-    printf "%s" "$C_RESET"
-
-    local opt_row
-    local opt_label
+draw_options() {
+    local i opt_row opt_label
     for i in "${!OPTIONS[@]}"; do
-        opt_row=$((start_row + 5 + i))
-        tput cup "$opt_row" $((start_col + 4))
+        opt_row=$((START_ROW + 5 + i))
+        tput cup "$opt_row" $((START_COL + 4))
         opt_label="$((i + 1)). ${OPTIONS[$i]}"
 
         if [[ $i -eq $selected_option ]]; then
-            # Opcion seleccionada con estilo terminal verde clasico (invertido).
-            printf "%s" "$C_FOCUS"
-            printf " %-60s " "$opt_label"
-            printf "%s" "$C_RESET"
+            printf "%s %-60s %s" "$C_FOCUS" "$opt_label" "$C_RESET"
         else
-            printf "%s" "$C_OPT_NORMAL"
-            printf " %-60s " "$opt_label"
-            printf "%s" "$C_RESET"
+            printf "%s %-60s %s" "$C_OPT_NORMAL" "$opt_label" "$C_RESET"
         fi
     done
+}
 
+draw_buttons() {
     local btn_row btn_col_accept btn_col_cancel
-    btn_row=$((start_row + box_h - 3))
-    btn_col_accept=$((start_col + box_w - 28))
-    btn_col_cancel=$((start_col + box_w - 15))
+    btn_row=$((START_ROW + BOX_H - 3))
+    btn_col_accept=$((START_COL + BOX_W - 28))
+    btn_col_cancel=$((START_COL + BOX_W - 15))
 
     tput cup "$btn_row" "$btn_col_accept"
     if [[ "$focus" == "buttons" && $selected_button -eq 0 ]]; then
-        printf "%s" "$C_FOCUS"
-        printf "< %s >" "${BUTTONS[0]}"
-        printf "%s" "$C_RESET"
+        printf "%s< %s >%s" "$C_FOCUS" "${BUTTONS[0]}" "$C_RESET"
     else
-        printf "%s" "$C_TEXT"
-        printf "< %s >" "${BUTTONS[0]}"
-        printf "%s" "$C_RESET"
+        printf "%s< %s >%s" "$C_TEXT" "${BUTTONS[0]}" "$C_RESET"
     fi
 
     tput cup "$btn_row" "$btn_col_cancel"
     if [[ "$focus" == "buttons" && $selected_button -eq 1 ]]; then
-        printf "%s" "$C_FOCUS"
-        printf "< %s >" "${BUTTONS[1]}"
-        printf "%s" "$C_RESET"
+        printf "%s< %s >%s" "$C_FOCUS" "${BUTTONS[1]}" "$C_RESET"
     else
-        printf "%s" "$C_TEXT"
-        printf "< %s >" "${BUTTONS[1]}"
-        printf "%s" "$C_RESET"
+        printf "%s< %s >%s" "$C_TEXT" "${BUTTONS[1]}" "$C_RESET"
     fi
-
-    tput cup $((start_row + box_h - 2)) $((start_col + 2))
-    printf "%s" "$C_HELP"
-    printf "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir"
-    printf "%s" "$C_RESET"
 }
 
-while true; do
-    draw_ui
+draw_help() {
+    tput cup $((START_ROW + BOX_H - 2)) $((START_COL + 2))
+    printf "%sFlechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir%s" "$C_HELP" "$C_RESET"
+}
 
-    key="$(get_key)"
+draw_ui() {
+    calc_layout
+    clear
+    draw_frame
+    draw_header
+    draw_options
+    draw_buttons
+    draw_help
+}
+
+handle_enter() {
+    if [[ "$focus" == "list" ]]; then
+        focus="buttons"
+        selected_button=0
+        confirm_armed=1
+        return 0
+    fi
+
+    if [[ $selected_button -eq 0 && $confirm_armed -eq 1 ]]; then
+        if [[ $selected_option -eq 3 ]]; then
+            result="Salir"
+            exit_requested=1
+        else
+            focus="list"
+            confirm_armed=0
+        fi
+        return 0
+    fi
+
+    # Cancelar vuelve a la lista.
+    focus="list"
+    confirm_armed=0
+}
+
+handle_key() {
+    local key="$1"
+
     case "$key" in
         UP)
             if [[ "$focus" == "list" ]]; then
@@ -242,31 +266,9 @@ while true; do
             fi
             ;;
         ENTER)
-            if [[ "$focus" == "list" ]]; then
-                # Enter en lista no ejecuta: pasa el foco a Aceptar.
-                focus="buttons"
-                selected_button=0
-                confirm_armed=1
-            else
-                if [[ $selected_button -eq 0 && $confirm_armed -eq 1 ]]; then
-                    if [[ $selected_option -eq 3 ]]; then
-                        result="Salir"
-                        exit_requested=1
-                    else
-                        # Para opciones 1-3, Aceptar no cierra este smoke test.
-                        # Vuelve el foco a la lista para seguir navegando.
-                        focus="list"
-                        confirm_armed=0
-                    fi
-                else
-                    # Cancelar vuelve a la lista (no salir del smoke test).
-                    focus="list"
-                    confirm_armed=0
-                fi
-            fi
+            handle_enter
             ;;
         ESC)
-            # ESC no sale: vuelve foco a la lista.
             focus="list"
             confirm_armed=0
             ;;
@@ -277,12 +279,27 @@ while true; do
         OTHER)
             ;;
     esac
+}
 
-    if [[ $exit_requested -eq 1 ]]; then
-        break
-    fi
+main() {
+    ensure_tty
+    init_palette
+    setup_terminal
+    trap cleanup EXIT INT TERM
 
-done
+    while true; do
+        draw_ui
+        key="$(get_key)"
+        handle_key "$key"
 
-cleanup
-printf "Resultado: %s\n" "$result"
+        if [[ $exit_requested -eq 1 ]]; then
+            break
+        fi
+    done
+
+    cleanup
+    trap - EXIT INT TERM
+    printf "Resultado: %s\n" "$result"
+}
+
+main
