@@ -13,6 +13,7 @@ OPTIONS=(
     "Salir"
 )
 BUTTONS=("Aceptar" "Cancelar")
+THEME_OPTIONS=("Blanco" "Naranja" "Verde")
 
 selected_option=0
 selected_button=0
@@ -34,6 +35,7 @@ C_TEXT=""
 C_HELP=""
 C_OPT_NORMAL=""
 C_FOCUS=""
+C_ORANGE_FG=""
 
 ensure_tty() {
     if [[ ! -t 0 || ! -t 1 ]]; then
@@ -59,23 +61,64 @@ cleanup() {
 }
 
 init_palette() {
+    C_RESET="$(tput sgr0 2>/dev/null || true)"
+
     if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
-        C_RESET="$(tput sgr0)"
-        if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
-            C_GREEN="$(printf '\033[92m')"
-            C_BG_GREEN="$(printf '\033[102m')"
+        if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ]]; then
+            C_ORANGE_FG="$(printf '\033[38;5;208m')"
         else
-            C_GREEN="$(tput setaf 2)"
-            C_BG_GREEN="$(tput setab 2)"
+            C_ORANGE_FG="$(tput setaf 3)"
         fi
-        C_BORDER="${C_GREEN}"
-        C_TITLE="$(tput bold)${C_GREEN}"
-        C_PROMPT="${C_GREEN}"
-        C_TEXT="${C_GREEN}"
-        C_HELP="${C_GREEN}"
-        C_OPT_NORMAL="${C_GREEN}"
-        C_FOCUS="$(tput setaf 0)${C_BG_GREEN}"
+        apply_theme "green"
     fi
+}
+
+apply_theme() {
+    local theme="$1"
+
+    if [[ "$(tput colors 2>/dev/null || echo 0)" -lt 8 ]]; then
+        C_BORDER=""
+        C_TITLE=""
+        C_PROMPT=""
+        C_TEXT=""
+        C_HELP=""
+        C_OPT_NORMAL=""
+        C_FOCUS=""
+        return 0
+    fi
+
+    local fg bg
+    case "$theme" in
+        white)
+            fg="$(tput setaf 7)"
+            bg="$(tput setab 7)"
+            ;;
+        orange)
+            fg="$C_ORANGE_FG"
+            if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ]]; then
+                bg="$(printf '\033[48;5;208m')"
+            else
+                bg="$(tput setab 3)"
+            fi
+            ;;
+        green|*)
+            if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
+                fg="$(printf '\033[92m')"
+                bg="$(printf '\033[102m')"
+            else
+                fg="$(tput setaf 2)"
+                bg="$(tput setab 2)"
+            fi
+            ;;
+    esac
+
+    C_BORDER="$fg"
+    C_TITLE="$(tput bold)${fg}"
+    C_PROMPT="$fg"
+    C_TEXT="$fg"
+    C_HELP="$fg"
+    C_OPT_NORMAL="$fg"
+    C_FOCUS="$(tput setaf 0)${bg}"
 }
 
 calc_layout() {
@@ -208,6 +251,76 @@ draw_ui() {
     draw_help
 }
 
+draw_theme_ui() {
+    local selected_theme="$1"
+    local i row label color
+
+    calc_layout
+    clear
+    draw_frame
+
+    tput cup $((START_ROW + 1)) $((START_COL + 2))
+    printf "%sSeleccion de Color%s" "$C_TITLE" "$C_RESET"
+
+    tput cup $((START_ROW + 3)) $((START_COL + 2))
+    printf "%sElige una paleta para continuar:%s" "$C_PROMPT" "$C_RESET"
+
+    for i in "${!THEME_OPTIONS[@]}"; do
+        row=$((START_ROW + 5 + i))
+        label="$((i + 1)). ${THEME_OPTIONS[$i]}"
+        tput cup "$row" $((START_COL + 4))
+
+        case "$i" in
+            0) color="$(tput setaf 7 2>/dev/null || true)" ;;
+            1) color="$C_ORANGE_FG" ;;
+            2) color="$(tput setaf 2 2>/dev/null || true)" ;;
+        esac
+
+        if [[ $i -eq $selected_theme ]]; then
+            printf "%s %-60s %s" "$C_FOCUS" "$label" "$C_RESET"
+        else
+            printf "%s %-60s %s" "$color" "$label" "$C_RESET"
+        fi
+    done
+
+    tput cup $((START_ROW + BOX_H - 2)) $((START_COL + 2))
+    printf "%sFlechas: mover | ENTER: seleccionar color | q: salir%s" "$C_HELP" "$C_RESET"
+}
+
+run_theme_selector() {
+    local selected_theme=2
+    local key
+
+    while true; do
+        draw_theme_ui "$selected_theme"
+        key="$(get_key)"
+
+        case "$key" in
+            UP)
+                (( selected_theme > 0 )) && selected_theme=$((selected_theme - 1))
+                ;;
+            DOWN)
+                (( selected_theme < ${#THEME_OPTIONS[@]} - 1 )) && selected_theme=$((selected_theme + 1))
+                ;;
+            ENTER)
+                case "$selected_theme" in
+                    0) apply_theme "white" ;;
+                    1) apply_theme "orange" ;;
+                    2) apply_theme "green" ;;
+                esac
+                return 0
+                ;;
+            QUIT)
+                result="Cancelado"
+                exit_requested=1
+                return 0
+                ;;
+            ESC|TAB|LEFT|RIGHT|OTHER)
+                ;;
+        esac
+    done
+}
+
 handle_enter() {
     if [[ "$focus" == "list" ]]; then
         focus="buttons"
@@ -286,6 +399,15 @@ main() {
     init_palette
     setup_terminal
     trap cleanup EXIT INT TERM
+
+    run_theme_selector
+
+    if [[ $exit_requested -eq 1 ]]; then
+        cleanup
+        trap - EXIT INT TERM
+        printf "Resultado: %s\n" "$result"
+        return 0
+    fi
 
     while true; do
         draw_ui
