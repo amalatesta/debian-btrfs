@@ -11,7 +11,8 @@ set -euo pipefail
 # - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - OK
 # - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
 # - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - OK
-# - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - Pendiente validacion
+# - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - OK
+# - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -482,6 +483,9 @@ ask_efi_in_plain_terminal() {
     efi_size="${efi_size:-1G}"
     DRYRUN_SELECTED_EFI="$efi_size"
 
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
     printf "\n[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
     printf "[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
