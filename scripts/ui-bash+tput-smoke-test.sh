@@ -26,12 +26,13 @@ tput civis
 # Paleta simple con fallback si la terminal no soporta color.
 if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
     C_RESET="$(tput sgr0)"
-    C_BORDER="$(tput setaf 6)"
-    C_TITLE="$(tput bold)$(tput setaf 3)"
+    C_BORDER="$(tput setaf 2)"
+    C_TITLE="$(tput bold)$(tput setaf 2)"
     C_PROMPT="$(tput setaf 2)"
-    C_TEXT="$(tput setaf 7)"
-    C_HELP="$(tput setaf 4)"
-    C_OPT_NORMAL="$(tput setaf 6)"
+    C_TEXT="$(tput setaf 2)"
+    C_HELP="$(tput setaf 2)"
+    C_OPT_NORMAL="$(tput setaf 2)"
+    C_FOCUS="$(tput setaf 0)$(tput setab 2)"
 else
     C_RESET=""
     C_BORDER=""
@@ -40,6 +41,7 @@ else
     C_TEXT=""
     C_HELP=""
     C_OPT_NORMAL=""
+    C_FOCUS=""
 fi
 
 TITLE="Test UI bash+tput"
@@ -147,11 +149,10 @@ draw_ui() {
         tput cup "$opt_row" $((start_col + 4))
 
         if [[ $i -eq $selected_option ]]; then
-            # Opcion seleccionada siempre en azul.
-            tput setaf 7
-            tput setab 4
+            # Opcion seleccionada con estilo terminal verde clasico (invertido).
+            printf "%s" "$C_FOCUS"
             printf " %-60s " "${OPTIONS[$i]}"
-            tput sgr0
+            printf "%s" "$C_RESET"
         else
             printf "%s" "$C_OPT_NORMAL"
             printf " %-60s " "${OPTIONS[$i]}"
@@ -166,10 +167,9 @@ draw_ui() {
 
     tput cup "$btn_row" "$btn_col_accept"
     if [[ "$focus" == "buttons" && $selected_button -eq 0 ]]; then
-        tput setaf 7
-        tput setab 1
+        printf "%s" "$C_FOCUS"
         printf "< %s >" "${BUTTONS[0]}"
-        tput sgr0
+        printf "%s" "$C_RESET"
     else
         printf "%s" "$C_TEXT"
         printf "< %s >" "${BUTTONS[0]}"
@@ -178,10 +178,9 @@ draw_ui() {
 
     tput cup "$btn_row" "$btn_col_cancel"
     if [[ "$focus" == "buttons" && $selected_button -eq 1 ]]; then
-        tput setaf 7
-        tput setab 1
+        printf "%s" "$C_FOCUS"
         printf "< %s >" "${BUTTONS[1]}"
-        tput sgr0
+        printf "%s" "$C_RESET"
     else
         printf "%s" "$C_TEXT"
         printf "< %s >" "${BUTTONS[1]}"
