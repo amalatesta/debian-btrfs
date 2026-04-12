@@ -480,6 +480,8 @@ run_with_report() {
 ask_efi_in_plain_terminal() {
     local option2_path="$1"
     local locale_value=""
+    local location_value=""
+    local location_choice=""
     local keyboard_value=""
     local timezone_value=""
     local efi_size=""
@@ -498,7 +500,6 @@ ask_efi_in_plain_terminal() {
     local run_keyboard_selector=""
     local quick_keyboard_choice=""
     local install_temp_tools=""
-    local inferred_locale_keyboard=""
 
     restore_terminal
     clear > /dev/tty
@@ -519,24 +520,58 @@ ask_efi_in_plain_terminal() {
 
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] orden estilo instalador Debian\n\n" > /dev/tty
+    printf "[dry-run] 1) Idioma\n" > /dev/tty
+    printf "[dry-run] 2) Pais / ubicacion\n" > /dev/tty
+    printf "[dry-run] 3) Teclado\n\n" > /dev/tty
 
-    read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
-    timezone_value="${timezone_value:-$default_timezone}"
-    DRYRUN_SELECTED_TIMEZONE="$timezone_value"
+    read -r -p "Locale [${default_locale}] : " locale_value < /dev/tty
+    locale_value="${locale_value:-$default_locale}"
+    DRYRUN_SELECTED_LOCALE="$locale_value"
 
-    case "$timezone_value" in
-        America/Argentina*|America/Montevideo|America/Santiago|America/Lima|America/Bogota|America/Mexico_City)
-            inferred_locale_keyboard="es_AR.UTF-8|latam"
-            ;;
-        Europe/Madrid)
-            inferred_locale_keyboard="es_ES.UTF-8|es"
-            ;;
+    case "$default_timezone" in
+        America/Argentina*) location_value="Argentina" ;;
+        Europe/Madrid) location_value="Espana" ;;
+        America/Mexico_City) location_value="Mexico" ;;
+        America/Bogota) location_value="Colombia" ;;
+        America/Santiago) location_value="Chile" ;;
+        America/Lima) location_value="Peru" ;;
+        America/Montevideo) location_value="Uruguay" ;;
+        *) location_value="Internacional" ;;
+    esac
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] pais / ubicacion (estilo Debian):\n" > /dev/tty
+    printf "[dry-run]   1) Argentina\n" > /dev/tty
+    printf "[dry-run]   2) Espana\n" > /dev/tty
+    printf "[dry-run]   3) Mexico\n" > /dev/tty
+    printf "[dry-run]   4) Colombia\n" > /dev/tty
+    printf "[dry-run]   5) Chile\n" > /dev/tty
+    printf "[dry-run]   6) Peru\n" > /dev/tty
+    printf "[dry-run]   7) Uruguay\n" > /dev/tty
+    printf "[dry-run]   8) Internacional / US\n" > /dev/tty
+    printf "[dry-run]   9) Otro (manual)\n\n" > /dev/tty
+    read -r -p "Opcion [9]: " location_choice < /dev/tty
+    location_choice="${location_choice:-9}"
+    case "$location_choice" in
+        1) location_value="Argentina"; default_timezone="America/Argentina/Buenos_Aires"; default_locale="es_AR.UTF-8"; default_keyboard="latam" ;;
+        2) location_value="Espana"; default_timezone="Europe/Madrid"; default_locale="es_ES.UTF-8"; default_keyboard="es" ;;
+        3) location_value="Mexico"; default_timezone="America/Mexico_City"; default_locale="es_MX.UTF-8"; default_keyboard="latam" ;;
+        4) location_value="Colombia"; default_timezone="America/Bogota"; default_locale="es_CO.UTF-8"; default_keyboard="latam" ;;
+        5) location_value="Chile"; default_timezone="America/Santiago"; default_locale="es_CL.UTF-8"; default_keyboard="latam" ;;
+        6) location_value="Peru"; default_timezone="America/Lima"; default_locale="es_PE.UTF-8"; default_keyboard="latam" ;;
+        7) location_value="Uruguay"; default_timezone="America/Montevideo"; default_locale="es_UY.UTF-8"; default_keyboard="latam" ;;
+        8) location_value="Internacional"; default_timezone="UTC"; default_locale="en_US.UTF-8"; default_keyboard="us" ;;
         *)
-            inferred_locale_keyboard="${default_locale}|${default_keyboard}"
+            read -r -p "Pais/ubicacion (texto libre) [${location_value}] : " location_value < /dev/tty
+            location_value="${location_value:-Internacional}"
             ;;
     esac
-    IFS='|' read -r default_locale default_keyboard <<< "$inferred_locale_keyboard"
+
+    if [[ -z "$default_keyboard" ]] && [[ "$locale_value" == es_* ]]; then
+        default_keyboard="es"
+    fi
 
     if command -v dpkg-reconfigure >/dev/null 2>&1; then
         clear > /dev/tty
@@ -565,10 +600,6 @@ ask_efi_in_plain_terminal() {
                 default_keyboard_source="selector-debian"
             fi
         fi
-    fi
-
-    if [[ -z "$default_keyboard" ]] && [[ "$default_locale" == es_* ]]; then
-        default_keyboard="es"
     fi
 
     clear > /dev/tty
@@ -613,20 +644,16 @@ ask_efi_in_plain_terminal() {
         fi
     fi
 
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-
-    read -r -p "Locale [${default_locale}] : " locale_value < /dev/tty
-    locale_value="${locale_value:-$default_locale}"
-    DRYRUN_SELECTED_LOCALE="$locale_value"
-
-    clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-
     read -r -p "Teclado [${default_keyboard}] : " keyboard_value < /dev/tty
     keyboard_value="${keyboard_value:-$default_keyboard}"
     DRYRUN_SELECTED_KEYBOARD="$keyboard_value"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] timezone derivada por ubicacion\n\n" > /dev/tty
+    read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
+    timezone_value="${timezone_value:-$default_timezone}"
+    DRYRUN_SELECTED_TIMEZONE="$timezone_value"
 
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
@@ -671,6 +698,7 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
     printf "[dry-run] Locale elegido: %s\n" "$locale_value" > /dev/tty
+    printf "[dry-run] Ubicacion elegida: %s\n" "$location_value" > /dev/tty
     printf "[dry-run] Teclado elegido: %s\n" "$keyboard_value" > /dev/tty
     printf "[dry-run] Timezone elegido: %s\n" "$timezone_value" > /dev/tty
     printf "[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
