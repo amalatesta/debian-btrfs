@@ -429,11 +429,14 @@ run_with_report() {
     local profile_spec
     local p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit
     local STATUS_LINES
+    local TAIL_LINES
 
     profile_spec="$(get_text_box_profile "compact")"
     IFS='|' read -r p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit <<< "$profile_spec"
 
-    while kill -0 "$run_pid" 2>/dev/null; do
+    while true; do
+        mapfile -t TAIL_LINES < <(tail -n 3 "$log_file" 2>/dev/null || true)
+
         STATUS_LINES=(
             "Ejecutando analisis dry-run..."
             ""
@@ -441,16 +444,32 @@ run_with_report() {
             ""
             "Estado: en curso ${spinner[$spin_idx]}"
             ""
-            "No cierres esta pantalla."
+            "Ultimo log:"
         )
+
+        if (( ${#TAIL_LINES[@]} > 0 )); then
+            STATUS_LINES+=("${TAIL_LINES[-1]}")
+        else
+            STATUS_LINES+=("iniciando...")
+        fi
+
+        STATUS_LINES+=("" "No cierres esta pantalla.")
 
         draw_centered_text_frame "$title" STATUS_LINES "Procesando..." "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
         spin_idx=$(( (spin_idx + 1) % 4 ))
+
+        if ! kill -0 "$run_pid" 2>/dev/null; then
+            break
+        fi
+
         sleep 0.12
     done
 
-    wait "$run_pid"
-    rc=$?
+    if wait "$run_pid"; then
+        rc=0
+    else
+        rc=$?
+    fi
 
     mapfile -t REPORT_LINES < "$log_file"
     if (( ${#REPORT_LINES[@]} == 0 )); then
