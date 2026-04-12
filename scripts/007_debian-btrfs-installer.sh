@@ -685,6 +685,22 @@ Opciones:
 EOF
 }
 
+reset_runtime_state() {
+    # Aislar cada ejecución de posibles variables heredadas del shell/TTY.
+    unset NEWT_COLORS || true
+
+    DRY_RUN="N"
+    UI_MODE="AUTO"
+    USE_WHIPTAIL="N"
+
+    PROGRESS_WHIPTAIL_ACTIVE="N"
+    PROGRESS_LAST_PCT=-1
+
+    DRY_RUN_WHIPTAIL_NEXT="S"
+    DRY_RUN_RETURN_TO_MENU="N"
+    WIZARD_ACTION=""
+}
+
 startup_wizard() {
     local action=""
     WIZARD_ACTION=""
@@ -2427,6 +2443,7 @@ show_final_summary() {
 # ============================================
 
 main() {
+    reset_runtime_state
     parse_args "$@"
     setup_ui
 
