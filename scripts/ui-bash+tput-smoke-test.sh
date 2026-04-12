@@ -20,21 +20,21 @@ selected_button=0
 focus="list"   # list | buttons
 confirm_armed=0
 exit_requested=0
-result=""
-
+# Smoke test UI en bash+tput (sin whiptail).
+# Base generica reusable para 008.
 BOX_W=76
-BOX_H=18
-START_COL=0
-START_ROW=0
+MAIN_TITLE="Test UI bash+tput"
+MAIN_PROMPT="Selecciona una opcion:"
+MAIN_OPTIONS=(
 
 C_RESET=""
 C_BORDER=""
 C_TITLE=""
 C_PROMPT=""
-C_TEXT=""
-C_HELP=""
+BUTTONS=("Aceptar" "Cancelar")
+THEME_OPTIONS=("Blanco" "Naranja" "Verde")
 C_OPT_NORMAL=""
-C_FOCUS=""
+MENU_SELECTED=0
 C_ORANGE_FG=""
 
 ensure_tty() {
