@@ -6,7 +6,8 @@ set -euo pipefail
 # Fecha: 2026-04-11
 #
 # Historial de mejoras
-# - 0008.0001 - Base limpia
+# - 0008.0001 - Base limpia - OK
+# - 0008.0002 - Enter confirma opcion resaltada (equivale a Aceptar)
 # ============================================
 
 if ! command -v whiptail >/dev/null 2>&1; then
@@ -27,7 +28,8 @@ if ! whiptail \
     --title "Debian Btrfs Installer v008" \
     --ok-button "Aceptar" \
     --cancel-button "Cancelar" \
-    --menu "Selecciona una opcion:" \
+    --default-item "1" \
+    --menu "Selecciona una opcion (ENTER = Aceptar):" \
     16 76 4 \
     "1" "Iniciar instalacion" \
     "2" "Modo prueba (dry-run)" \
