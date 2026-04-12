@@ -728,7 +728,7 @@ ask_efi_in_plain_terminal() {
 
     clear > /dev/tty
     printf "\n" > /dev/tty
-    read -r -p "Crear particion BACKUP? [${default_backup}]: " create_backup < /dev/tty
+    read -r -p "Crear particion de Backup? [S/n]: " create_backup < /dev/tty
     create_backup="${create_backup:-$default_backup}"
     create_backup="${create_backup^^}"
     if [[ "$create_backup" != "S" ]]; then
