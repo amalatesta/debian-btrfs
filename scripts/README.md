@@ -33,6 +33,13 @@ Documenta lo completado, en progreso y lo proyectado.
 - Integración sin dependencia de scripts/006
 - Validado en VM con flujo completo (precheck → ejecución → resultado)
 
+#### 0004 - Opción 2 ampliada (dry-run guiado)
+- Validaciones de entorno (bash, tput, lsblk, findmnt, awk, sed)
+- Detección de contexto de ejecución (kernel, usuario, raíz)
+- Detección de hardware y particiones en modo solo lectura
+- Preview explícito de acciones reales (sin tocar disco)
+- Flujo por etapas con logs claros `[step]`, `[ok]`, `[warn]`
+
 ### dry_run.sh - Auxiliar de Opción 2
 - Parte 1: Validaciones básicas de entorno (bash, tput)
 - Extensible para flujo dry-run futuro
@@ -41,10 +48,11 @@ Documenta lo completado, en progreso y lo proyectado.
 
 ## 🔄 Trabajo en Progreso
 
-### 0008.0004 - Ampliar opción 2 o trabajar opción 1
-- Decisión pendiente: profundizar dry-run o implementar instalación real
+### 0008.0005 - Chequeos guiados de disco objetivo
+- Definir selección segura del disco candidato (solo preview)
+- Agregar recomendaciones contextuales según hardware detectado
 - Manteniendo patrón modular de 008
-- Plan: consolidar en 008 cuando sea completo
+- Plan: preparar puente con opción 1 sin ejecutar cambios reales
 
 ---
 
@@ -190,6 +198,7 @@ bash scripts/008_debian-btrfs-installer.sh
 | 419f884 | 0008.0002-b | Perfiles de pantalla (compact/normal/wide) |
 | 69d819c | 0008.0003 | Opción 2 → dry_run.sh |
 | 688ce67 | 0008.0003-OK | Marca 0003-OK, abre 0004 |
+| (pendiente) | 0008.0004-OK | Opción 2 ampliada y validada localmente |
 | 92417ca | - | README.md bitácora inicial |
 | (pendiente) | README | Restructuración a bitácora explícita |
 | (próximo) | 0008.0004 | Decisión próxima fase |
@@ -228,4 +237,4 @@ Flujo de cambios:
 
 ---
 
-**Última actualización**: 2026-04-12 (0008.0003 cerrado, 0008.0004 pendiente decisión)
+**Última actualización**: 2026-04-12 (0008.0004 cerrado, 0008.0005 en preparación)

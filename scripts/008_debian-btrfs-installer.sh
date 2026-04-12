@@ -9,7 +9,8 @@ set -euo pipefail
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
 # - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
 # - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - OK
-# - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - Pendiente validacion
+# - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
+# - 0008.0005 - Integrar chequeos guiados para disco objetivo y recomendaciones - Pendiente
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
