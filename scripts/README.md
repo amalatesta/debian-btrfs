@@ -1,40 +1,52 @@
-# Scripts - Debian Btrfs Installer
+# 📋 Scripts - Bitácora de Trabajo
 
-## Estado Actual
+Registro vivo del desarrollo de la interfaz bash+tput para el instalador Debian Btrfs.
+Documenta lo completado, en progreso y lo proyectado.
 
-### v008 - Motor principal (v008_debian-btrfs-installer.sh)
-- **Versión**: 008
-- **Estado**: En desarrollo activo
-- **Archivo**: `008_debian-btrfs-installer.sh`
+---
 
-#### Historial de Versiones
-- **0008.0001** - ✅ OK
-  - Base bash+tput (motor UI integrado)
-  - Framework de menú, navegación, colores
-  - Soporte para temas (blanco, naranja, verde)
+## 📊 Estado Actual
 
-- **0008.0002** - ✅ OK
-  - Ayuda integrada dentro del marco UI
-  - Refactor UI genérico (helpers reutilizables)
-  - Scroll interno con Up/Down/PgUp/PgDn
-  - Perfiles de pantalla (compact, normal, wide-log)
-  - Confirmación Sí/No
-  - Preview de comandos
-  - `run_with_progress()` para ejecuciones futuras
+## ✅ Trabajo Completado
 
-- **0008.0003** - ✅ OK
-  - Opción 2 (Modo prueba / dry-run) externalizada
-  - Script dedicado: `dry_run.sh`
-  - Ejecución controlada desde menú
-  - Validado en VM
+### v008_debian-btrfs-installer.sh - Motor Principal
 
-- **0008.0004** - 🔄 En progreso
-  - Próximo: Ampliar opción 2 o trabajar en opción 1
+#### 0001 - Base bash+tput
+- Motor UI completo basado en tput (sin whiptail)
+- Menú genérico reutilizable con navegación por flechas/TAB
+- Sistema de temas (blanco, naranja, verde) seleccionables
+- Detección de colores de terminal (8/16/256)
+- Centrado automático y ajuste por tamaño de terminal
 
-### Scripts auxiliares
-- **dry_run.sh**: Ejecutable por opción 2 del menú
-  - Parte 1: Validaciones básicas de entorno
-  - Extensible para flujo dry-run completo futuro
+#### 0002 - Ayuda integrada + Helpers genéricos
+- Pantalla de ayuda dentro del marco UI (no texto plano)
+- Scroll interno: Up/Down/PgUp/PgDn (similar a whiptail)
+- Perfiles de pantalla adaptativos (compact, normal, wide-log)
+- Confirmación binaria reutilizable (Sí/No)
+- Preview de comandos genérico
+- `run_with_progress()` para ejecuciones futuras con seguimiento visual
+- Helpers: info_box, message_box, success_box, error_box, todo_screen
+
+#### 0003 - Opción 2 (Modo prueba) externalizada
+- Script dedicado: `dry_run.sh` (mismo directorio que 008)
+- Ejecución controlada desde menú
+- Integración sin dependencia de scripts/006
+- Validado en VM con flujo completo (precheck → ejecución → resultado)
+
+### dry_run.sh - Auxiliar de Opción 2
+- Parte 1: Validaciones básicas de entorno (bash, tput)
+- Extensible para flujo dry-run futuro
+
+---
+
+## 🔄 Trabajo en Progreso
+
+### 0008.0004 - Ampliar opción 2 o trabajar opción 1
+- Decisión pendiente: profundizar dry-run o implementar instalación real
+- Manteniendo patrón modular de 008
+- Plan: consolidar en 008 cuando sea completo
+
+---
 
 ## Estructura General del Menú
 
@@ -75,28 +87,36 @@
 - `apply_theme()` - Temas de color (blanco, naranja, verde)
 - `get_key_raw()` - Lector de teclas (flechas, PgUp/PgDn, Enter, etc.)
 
-## Próximos Pasos (0008.0004 y más allá)
+## 🎯 Próximos Pasos
 
-### Opción 2 - Modo prueba (ampliar dry_run.sh)
-- [ ] Implementar validaciones de requisitos (root, UEFI, internet)
-- [ ] Detección de discos automática
-- [ ] Análisis de hardware y sugerencias
-- [ ] Flujo interactivo de preguntas no críticas
-- [ ] Preview del plan de instalación
-- [ ] Ejecución controlada paso a paso
+### Fase 2: Ampliar Opción 2 (Dry-run Completo)
+**Decisión 0008.0004**: Expandir `dry_run.sh` con:
+- Validación de requisitos (disk space mínimo, BIOS/firmware, etc.)
+- Detección de hardware (nvme, ssd, hdd)
+- Análisis interactivo de particiones existentes
+- Preview de configuración (qué se haría)
+- Ejecución paso a paso con feedback
 
-### Opción 1 - Instalación Real (futuro)
-- [ ] Integrar lógica de 005 en 008
-- [ ] Validaciones iniciales
-- [ ] Configuración interactiva
-- [ ] Instalación con barra de progreso en UI
-- [ ] Manejo de errores mejorado
+**Commits necesarios**:
+- 0008.0004: Ampliar validaciones básicas
+- 0008.0005: Añadir detectores de hardware
+- 0008.0006: Construir preview UI
 
-### Consolidación (futuro)
-- [ ] Traer todo de `dry_run.sh` dentro de 008 como función modular `option_dryrun()`
-- [ ] Opción 1 como función modular `option_install()`
-- [ ] Estructura única en 008_debian-btrfs-installer.sh sin archivos auxiliares
-- [ ] Mantener modularidad y reutilización de código
+### Fase 3: Implementar Opción 1 (Instalación Integrada)
+- Dentro del motor 008 (sin scripts externos nuevos)
+- Reutilizar helpers (confirm, progress, etc.)
+- Integración con dry_run.sh para obtener config
+- Ejecución de pasos reales (formato, instalación, bootloader)
+
+### Fase 4: Consolidación y Limpieza
+- Internalizar `dry_run.sh` como función dentro de 008
+- Mantener modularidad pero en un solo archivo
+- Validar que todo sigue funcionando en VM
+- Preparar para futuro mantenimiento
+
+---
+
+## 📝 Notas de Diseño
 
 ## Cómo Ejecutar
 
@@ -135,25 +155,56 @@ bash scripts/008_debian-btrfs-installer.sh
 4. Marca versión como OK cuando valdida
 5. Abre siguiente versión para próximos pasos
 
-## Decisiones Técnicas
-
-### Por qué bash+tput y no whiptail
-- Control total sobre comportamiento
-- Scroll interno como whiptail pero personalizable
+### bash+tput vs whiptail
+- Elegimos bash+tput por control total
+- Scroll interno personalizable (similar a whiptail pero flexible)
 - Sin dependencias GUI pesadas
-- Funciona en más contextos (VM, SSH, etc.)
-- Motor reutilizable para futuras opciones
+- Funciona en VM, SSH, ambientes restringidos
+- Motor reutilizable sin cambios futuros
 
-### Por qué versionado en cabecera
-- Gobernanza explícita de cambios
-- Facilita seguimiento de iteraciones
-- Regla clara: no duplicar versión hasta OK
-- Permite historial de lo que fue probado
+### Versionado en cabecera (0008.0001, 0008.0002, etc.)
+- Gobernanza explícita: versionado por iteración
+- Regla: nueva versión solo después de validar en VM y marcar/OK/
+- Historial de cambios dentro del código (single source of truth)
+- Facilita rollback o referencia a cambios específicos
 
-### Por qué dry_run.sh separado por ahora
-- Encapsulación clara durante desarrollo
-- Fácil testing independiente
-- Plan: consolidar en 008 cuando esté completo
+### Perfiles de pantalla (compact, normal, wide-log)
+- Adaptación futura para diferentes tipos de contenido
+- Preview de comandos → wide-log (más espacio)
+- Errores/confirmaciones → compact (conciso)
+- Diferencia entre necesidades de UI sin duplicar motor
+
+### Modularidad progresiva
+- Hoy: `dry_run.sh` separado (claro testing/aislamiento)
+- Mañana: dentro de 008 como función (consolidación)
+- Facilita evolución sin caos de archivos
+
+---
+
+## � Historial de Commits
+
+| Commit | Versión | Cambio |
+|--------|---------|--------|
+| ca96dff | 0008.0001 | Bash+tput motor + menú principal |
+| e59a7eb | 0008.0002 | Ayuda en frame + scroll + helpers |
+| 419f884 | 0008.0002-b | Perfiles de pantalla (compact/normal/wide) |
+| 69d819c | 0008.0003 | Opción 2 → dry_run.sh |
+| 688ce67 | 0008.0003-OK | Marca 0003-OK, abre 0004 |
+| 92417ca | - | README.md bitácora inicial |
+| (pendiente) | README | Restructuración a bitácora explícita |
+| (próximo) | 0008.0004 | Decisión próxima fase |
+
+---
+
+## �💡 Lecciones Aprendidas
+
+1. **Iteración corta + Push inmediato**: Validación en VM después de cada cambio acelera feedback
+2. **Naming explícito**: `dry_run.sh` en lugar de `opcion-2-...` reduce fricción
+3. **Versionado en código**: Cabecera del script como fuente de verdad de historia
+4. **Funciones genéricas primero**: Invertir tiempo en helpers reutilizables paga dividendos
+5. **No prematura consolidación**: Mantener separado hasta que sea claro el patrón
+6. **Tests sintácticos constantes**: `bash -n` cada cambio evita sorpresas
+7. **Scroll interno importante**: Para contenido variable, crucial la UX tipo whiptail
 
 ## Logs y Debugging
 
@@ -177,4 +228,4 @@ Flujo de cambios:
 
 ---
 
-**Última actualización**: 2026-04-12 (0008.0003 cerrado, 0008.0004 en progreso)
+**Última actualización**: 2026-04-12 (0008.0003 cerrado, 0008.0004 pendiente decisión)
