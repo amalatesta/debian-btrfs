@@ -494,6 +494,8 @@ ask_efi_in_plain_terminal() {
     local default_locale="en_US.UTF-8"
     local default_timezone="UTC"
     local default_keyboard="us"
+    local default_keyboard_source="heuristica"
+    local install_temp_tools=""
 
     restore_terminal
     clear > /dev/tty
@@ -507,11 +509,39 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_SWAP) default_swap="$value" ;;
             DRYRUN_DEFAULT_LOCALE) default_locale="$value" ;;
             DRYRUN_DEFAULT_TIMEZONE) default_timezone="$value" ;;
+            DRYRUN_DEFAULT_KEYBOARD) default_keyboard="$value" ;;
+            DRYRUN_DEFAULT_KEYBOARD_SOURCE) default_keyboard_source="$value" ;;
         esac
     done <<< "$defaults_output"
 
-    if [[ "$default_locale" == es_* ]]; then
+    if [[ -z "$default_keyboard" ]] && [[ "$default_locale" == es_* ]]; then
         default_keyboard="es"
+    fi
+
+    if [[ "$default_keyboard_source" != "system-file" ]]; then
+        clear > /dev/tty
+        printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+        printf "[dry-run] no se detecto teclado del sistema con certeza.\n" > /dev/tty
+        printf "[dry-run] se puede instalar temporalmente (solo en Live) para mejorar deteccion.\n\n" > /dev/tty
+        read -r -p "Instalar temporalmente herramientas de teclado? [s/N]: " install_temp_tools < /dev/tty
+        install_temp_tools="${install_temp_tools^^}"
+
+        if [[ "$install_temp_tools" == "S" ]]; then
+            clear > /dev/tty
+            printf "[dry-run] instalando temporalmente (console-setup, keyboard-configuration)...\n" > /dev/tty
+            if DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 && \
+               DEBIAN_FRONTEND=noninteractive apt-get install -y console-setup keyboard-configuration >/dev/null 2>&1; then
+                local detected_keyboard
+                detected_keyboard="$(awk -F= '/^XKBLAYOUT=/{gsub(/"/,"",$2); print $2; exit}' /etc/default/keyboard 2>/dev/null || true)"
+                if [[ -n "$detected_keyboard" ]]; then
+                    default_keyboard="$detected_keyboard"
+                fi
+                printf "[dry-run] instalacion temporal completada.\n" > /dev/tty
+            else
+                printf "[dry-run] no se pudo instalar temporalmente (sin red o paquetes no disponibles).\n" > /dev/tty
+            fi
+            sleep 1
+        fi
     fi
 
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty

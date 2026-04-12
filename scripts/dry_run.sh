@@ -20,6 +20,7 @@ SUGGESTED_TIMEZONE=""
 SUGGESTED_LOCALE=""
 SUGGESTED_HOSTNAME="debian-pc"
 SUGGESTED_KEYBOARD="us"
+SUGGESTED_KEYBOARD_SOURCE="heuristica"
 CREATE_BACKUP="S"
 SELECTED_EFI_SIZE=""
 SELECTED_EFI_GB=1
@@ -135,10 +136,22 @@ calculate_recommendations() {
     SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
     [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
 
-    if [[ "$SUGGESTED_LOCALE" == es_* ]]; then
-        SUGGESTED_KEYBOARD="es"
-    else
-        SUGGESTED_KEYBOARD="us"
+    if [[ -f /etc/default/keyboard ]]; then
+        local kb_layout
+        kb_layout="$(awk -F= '/^XKBLAYOUT=/{gsub(/"/,"",$2); print $2; exit}' /etc/default/keyboard 2>/dev/null || true)"
+        if [[ -n "$kb_layout" ]]; then
+            SUGGESTED_KEYBOARD="$kb_layout"
+            SUGGESTED_KEYBOARD_SOURCE="system-file"
+        fi
+    fi
+
+    if [[ "$SUGGESTED_KEYBOARD_SOURCE" != "system-file" ]]; then
+        if [[ "$SUGGESTED_LOCALE" == es_* ]]; then
+            SUGGESTED_KEYBOARD="es"
+        else
+            SUGGESTED_KEYBOARD="us"
+        fi
+        SUGGESTED_KEYBOARD_SOURCE="heuristica"
     fi
 
     SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$SUGGESTED_EFI}")"
@@ -189,6 +202,8 @@ print_defaults() {
     printf 'DRYRUN_DEFAULT_SWAP=%s\n' "$SUGGESTED_SWAP"
     printf 'DRYRUN_DEFAULT_LOCALE=%s\n' "$SUGGESTED_LOCALE"
     printf 'DRYRUN_DEFAULT_TIMEZONE=%s\n' "$SUGGESTED_TIMEZONE"
+    printf 'DRYRUN_DEFAULT_KEYBOARD=%s\n' "$SUGGESTED_KEYBOARD"
+    printf 'DRYRUN_DEFAULT_KEYBOARD_SOURCE=%s\n' "$SUGGESTED_KEYBOARD_SOURCE"
 }
 
 analyze_memory() {
