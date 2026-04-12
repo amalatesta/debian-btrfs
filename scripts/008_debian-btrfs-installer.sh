@@ -30,6 +30,14 @@ BOX_H=18
 START_COL=0
 START_ROW=0
 
+BASE_BOX_W=76
+BASE_BOX_H=18
+MIN_BOX_W=50
+MIN_BOX_H=14
+MAX_TEXT_BOX_W=100
+MAX_TEXT_BOX_H=24
+TEXT_BOX_PAGE_LINE_LIMIT=16
+
 MENU_EVENT=""
 MENU_SELECTED=0
 result=""
@@ -82,21 +90,106 @@ show_help_screen() {
         "  - Opciones 1 y 2: en construccion"
     )
 
-    show_centered_text_box "AYUDA - Debian Btrfs Installer v008" HELP_LINES "ENTER/Esc/q: volver al menu"
+    show_centered_text_box "AYUDA - Debian Btrfs Installer v008" HELP_LINES "ENTER/Esc/q: volver al menu" "normal"
+}
+
+get_text_box_profile() {
+    local profile="${1:-normal}"
+
+    case "$profile" in
+        compact)
+            # base_w|base_h|min_w|min_h|max_w|max_h|page_limit
+            echo "68|16|50|14|90|20|10"
+            ;;
+        wide-log)
+            echo "84|18|56|14|116|28|14"
+            ;;
+        normal|*)
+            echo "${BASE_BOX_W}|${BASE_BOX_H}|${MIN_BOX_W}|${MIN_BOX_H}|${MAX_TEXT_BOX_W}|${MAX_TEXT_BOX_H}|${TEXT_BOX_PAGE_LINE_LIMIT}"
+            ;;
+    esac
 }
 
 show_centered_text_box() {
     local title="$1"
     local lines_name="$2"
     local footer="$3"
+    local profile="${4:-normal}"
     local -n lines_ref="$lines_name"
-    local key
+    local key footer_view
+    local total_lines start end count offset max_offset
+    local profile_spec
+    local p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit
+    local VIEW_LINES
+    local jump_size
+
+    profile_spec="$(get_text_box_profile "$profile")"
+    IFS='|' read -r p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit <<< "$profile_spec"
+
+    total_lines=${#lines_ref[@]}
+    if (( total_lines < 1 )); then
+        VIEW_LINES=("")
+        draw_centered_text_frame "$title" VIEW_LINES "$footer" "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
+        while true; do
+            key="$(get_key_raw)"
+            case "$key" in
+                ENTER|ESC|QUIT)
+                    return 0
+                    ;;
+            esac
+        done
+    fi
+
+    offset=0
+    max_offset=$(( total_lines - p_page_limit ))
+    (( max_offset < 0 )) && max_offset=0
+    jump_size=$((p_page_limit - 2))
+    (( jump_size < 1 )) && jump_size=1
 
     while true; do
-        draw_centered_text_frame "$title" "$lines_name" "$footer"
+        start=$offset
+        end=$((start + p_page_limit))
+        (( end > total_lines )) && end=$total_lines
+        count=$((end - start))
+
+        if (( count > 0 )); then
+            VIEW_LINES=("${lines_ref[@]:start:count}")
+        else
+            VIEW_LINES=("")
+        fi
+
+        if (( total_lines > p_page_limit )); then
+            footer_view="${footer} | Up/Down/PgUp/PgDn: scroll (${start+1}-${end}/${total_lines}) | ENTER/Esc/q: cerrar"
+        else
+            footer_view="$footer"
+        fi
+
+        draw_centered_text_frame "$title" VIEW_LINES "$footer_view" "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
 
         key="$(get_key_raw)"
         case "$key" in
+            UP)
+                if (( offset > 0 )); then
+                    offset=$((offset - 1))
+                fi
+                ;;
+            DOWN)
+                if (( offset < max_offset )); then
+                    offset=$((offset + 1))
+                fi
+                ;;
+            PGUP)
+                if (( offset > 0 )); then
+                    offset=$((offset - jump_size))
+                    (( offset < 0 )) && offset=0
+                fi
+                ;;
+            PGDN)
+                if (( offset < max_offset )); then
+                    offset=$((offset + jump_size))
+                    (( offset > max_offset )) && offset=$max_offset
+                fi
+                ;;
             ENTER|ESC|QUIT)
                 return 0
                 ;;
@@ -108,10 +201,35 @@ draw_centered_text_frame() {
     local title="$1"
     local lines_name="$2"
     local footer="$3"
+    local base_w="$4"
+    local base_h="$5"
+    local min_w="$6"
+    local min_h="$7"
+    local max_w="$8"
+    local max_h="$9"
     local -n lines_ref="$lines_name"
     local i line line_row content_width max_lines
+    local max_len title_len footer_len desired_w desired_h
 
-    calc_layout
+    max_len=0
+    for line in "${lines_ref[@]}"; do
+        (( ${#line} > max_len )) && max_len=${#line}
+    done
+
+    title_len=${#title}
+    footer_len=${#footer}
+    (( title_len > max_len )) && max_len=$title_len
+    (( footer_len > max_len )) && max_len=$footer_len
+
+    desired_w=$((max_len + 6))
+    (( desired_w < base_w )) && desired_w=$base_w
+    (( desired_w > max_w )) && desired_w=$max_w
+
+    desired_h=$(( ${#lines_ref[@]} + 6 ))
+    (( desired_h < base_h )) && desired_h=$base_h
+    (( desired_h > max_h )) && desired_h=$max_h
+
+    calc_layout_with_target "$desired_w" "$desired_h" "$min_w" "$min_h"
     clear
     draw_frame
 
@@ -131,20 +249,44 @@ draw_centered_text_frame() {
     printf "%s%s%s" "$C_HELP" "$footer" "$C_RESET"
 }
 
+calc_layout_with_target() {
+    local target_w="$1"
+    local target_h="$2"
+    local min_w="${3:-$MIN_BOX_W}"
+    local min_h="${4:-$MIN_BOX_H}"
+    local cols lines
+
+    cols="$(tput cols)"
+    lines="$(tput lines)"
+
+    BOX_W="$target_w"
+    BOX_H="$target_h"
+
+    (( BOX_W > cols - 2 )) && BOX_W=$((cols - 2))
+    (( BOX_H > lines - 2 )) && BOX_H=$((lines - 2))
+    (( BOX_W < min_w )) && BOX_W=$min_w
+    (( BOX_H < min_h )) && BOX_H=$min_h
+
+    START_COL=$(( (cols - BOX_W) / 2 ))
+    START_ROW=$(( (lines - BOX_H) / 2 ))
+}
+
 show_info_box() {
     local title="$1"
     local lines_name="$2"
     local footer="${3:-ENTER/Esc/q: volver}"
-    show_centered_text_box "$title" "$lines_name" "$footer"
+    local profile="${4:-normal}"
+    show_centered_text_box "$title" "$lines_name" "$footer" "$profile"
 }
 
 show_message_box() {
     local title="$1"
     local message="$2"
     local footer="${3:-ENTER/Esc/q: volver}"
+    local profile="${4:-normal}"
     local MSG_LINES=("$message")
 
-    show_info_box "$title" MSG_LINES "$footer"
+    show_info_box "$title" MSG_LINES "$footer" "$profile"
 }
 
 show_todo_screen() {
@@ -156,17 +298,17 @@ show_todo_screen() {
         "La UI ya esta preparada para reutilizar este cuadro."
     )
 
-    show_info_box "EN CONSTRUCCION" TODO_LINES "ENTER/Esc/q: volver al menu"
+    show_info_box "EN CONSTRUCCION" TODO_LINES "ENTER/Esc/q: volver al menu" "compact"
 }
 
 show_success_box() {
     local lines_name="$1"
-    show_info_box "OK" "$lines_name" "ENTER/Esc/q: continuar"
+    show_info_box "OK" "$lines_name" "ENTER/Esc/q: continuar" "compact"
 }
 
 show_error_box() {
     local lines_name="$1"
-    show_info_box "ERROR" "$lines_name" "ENTER/Esc/q: volver"
+    show_info_box "ERROR" "$lines_name" "ENTER/Esc/q: volver" "compact"
 }
 
 show_command_preview() {
@@ -181,7 +323,7 @@ show_command_preview() {
         "$note"
     )
 
-    show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu"
+    show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu" "wide-log"
 }
 
 confirm_yes_no() {
@@ -231,7 +373,7 @@ run_with_progress() {
     if (( ${#OUTPUT_TAIL[@]} > 0 )); then
         local TAIL_LINES=("Ultimas lineas de salida:" "")
         TAIL_LINES+=("${OUTPUT_TAIL[@]}")
-        show_info_box "SALIDA (RESUMEN)" TAIL_LINES "ENTER/Esc/q: volver"
+        show_info_box "SALIDA (RESUMEN)" TAIL_LINES "ENTER/Esc/q: volver" "wide-log"
     fi
 
     rm -f "$log_file"
@@ -301,24 +443,11 @@ apply_theme() {
 }
 
 calc_layout() {
-    local cols lines
-    cols="$(tput cols)"
-    lines="$(tput lines)"
-
-    BOX_W=76
-    BOX_H=18
-
-    (( BOX_W > cols - 2 )) && BOX_W=$((cols - 2))
-    (( BOX_H > lines - 2 )) && BOX_H=$((lines - 2))
-    (( BOX_W < 50 )) && BOX_W=50
-    (( BOX_H < 14 )) && BOX_H=14
-
-    START_COL=$(( (cols - BOX_W) / 2 ))
-    START_ROW=$(( (lines - BOX_H) / 2 ))
+    calc_layout_with_target "$BASE_BOX_W" "$BASE_BOX_H"
 }
 
 get_key_raw() {
-    local k rest read_status
+    local k rest read_status tail
     IFS= read -rsn1 k
     read_status=$?
 
@@ -339,6 +468,14 @@ get_key_raw() {
             "[B") echo "DOWN" ;;
             "[C") echo "RIGHT" ;;
             "[D") echo "LEFT" ;;
+            "[5")
+                IFS= read -rsn1 tail || true
+                [[ "${tail:-}" == "~" ]] && echo "PGUP" || echo "ESC"
+                ;;
+            "[6")
+                IFS= read -rsn1 tail || true
+                [[ "${tail:-}" == "~" ]] && echo "PGDN" || echo "ESC"
+                ;;
             "OM") echo "ENTER" ;;
             "Op") echo "DIGIT:0" ;;
             "Oq") echo "DIGIT:1" ;;
@@ -602,7 +739,7 @@ main() {
     esac
 
     while true; do
-        run_menu "$MAIN_TITLE" "$MAIN_PROMPT" MAIN_OPTIONS 1 1 "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | 1-4 directo | q: salir" 1 0
+        run_menu "$MAIN_TITLE" "$MAIN_PROMPT" MAIN_OPTIONS 1 1 "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir" 1 0
 
         if [[ "$MENU_EVENT" == "QUIT" ]]; then
             result="Cancelado"
