@@ -85,6 +85,7 @@ get_key() {
             "[B") echo "DOWN" ;;
             "[C") echo "RIGHT" ;;
             "[D") echo "LEFT" ;;
+            "OM") echo "ENTER" ;;
             *) echo "ESC" ;;
         esac
         return 0
@@ -263,7 +264,12 @@ while true; do
                 fi
             fi
             ;;
-        ESC|QUIT)
+        ESC)
+            # ESC no sale: vuelve foco a la lista.
+            focus="list"
+            confirm_armed=0
+            ;;
+        QUIT)
             result="Cancelado"
             break
             ;;
