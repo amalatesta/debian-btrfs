@@ -24,6 +24,7 @@ SELECTED_EFI_SIZE=""
 SELECTED_EFI_GB=1
 SELECTED_SYSTEM_SIZE=""
 SELECTED_SYSTEM_GB=0
+SELECTED_SWAP_SIZE=""
 SELECTED_CREATE_BACKUP="S"
 EFFECTIVE_BACKUP_GB=0
 
@@ -142,6 +143,11 @@ calculate_recommendations() {
     if (( SELECTED_SYSTEM_GB < 16 )); then
         SELECTED_SYSTEM_SIZE="${SUGGESTED_SYSTEM_GB}G"
         SELECTED_SYSTEM_GB="$SUGGESTED_SYSTEM_GB"
+    fi
+
+    SELECTED_SWAP_SIZE="$(normalize_size_gib "${DRYRUN_SWAP_SIZE:-$SUGGESTED_SWAP}")"
+    if (( $(size_gib_to_int "$SELECTED_SWAP_SIZE") < 1 )); then
+        SELECTED_SWAP_SIZE="$SUGGESTED_SWAP"
     fi
 
     SELECTED_CREATE_BACKUP="${DRYRUN_CREATE_BACKUP:-$CREATE_BACKUP}"
@@ -308,7 +314,7 @@ analyze_and_suggest() {
     fi
 
     printf "[dry-run] Sugerido --> Swapfile: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
-    printf "[dry-run] Elegido  --> Swapfile: %s\n" "$SUGGESTED_SWAP"
+    printf "[dry-run] Elegido  --> Swapfile: %s\n" "$SELECTED_SWAP_SIZE"
 
     printf "[dry-run] Sugerido --> Hostname: %s\n" "$SUGGESTED_HOSTNAME"
     printf "[dry-run] Elegido  --> Hostname: %s\n" "$SUGGESTED_HOSTNAME"
@@ -499,7 +505,7 @@ EOF
 [dry-run]     - /.snapshots -> subvol=@snapshots
 EOF
 
-    printf "[dry-run]     - /var/swap   -> subvol=@swap (swapfile %s)\n" "$SUGGESTED_SWAP"
+    printf "[dry-run]     - /var/swap   -> subvol=@swap (swapfile %s)\n" "$SELECTED_SWAP_SIZE"
 
     cat <<'EOF'
 [dry-run] comandos de referencia (no ejecutados):

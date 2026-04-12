@@ -51,6 +51,7 @@ result=""
 DRYRUN_SELECTED_EFI="1G"
 DRYRUN_SELECTED_SYSTEM=""
 DRYRUN_SELECTED_BACKUP="S"
+DRYRUN_SELECTED_SWAP=""
 
 C_RESET=""
 C_BORDER=""
@@ -477,10 +478,12 @@ ask_efi_in_plain_terminal() {
     local efi_size=""
     local system_size=""
     local create_backup=""
+    local swap_size=""
     local defaults_output key value
     local default_efi="1G"
     local default_system="64G"
     local default_backup="S"
+    local default_swap="8G"
 
     restore_terminal
     clear > /dev/tty
@@ -491,13 +494,13 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_EFI) default_efi="$value" ;;
             DRYRUN_DEFAULT_SYSTEM) default_system="$value" ;;
             DRYRUN_DEFAULT_CREATE_BACKUP) default_backup="$value" ;;
+            DRYRUN_DEFAULT_SWAP) default_swap="$value" ;;
         esac
     done <<< "$defaults_output"
 
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
 
-    printf "[dry-run] [valor] - Sugerido por defecto\n" > /dev/tty
     printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
     read -r -p "Tamano EFI [${default_efi}] : " efi_size < /dev/tty
     efi_size="${efi_size:-$default_efi}"
@@ -506,10 +509,20 @@ ask_efi_in_plain_terminal() {
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
 
-    read -r -p "Tamano SISTEMA para simulacion [${default_system}]: " system_size < /dev/tty
+    read -r -p "Tamano SISTEMA [${default_system}] : " system_size < /dev/tty
     system_size="${system_size:-$default_system}"
     DRYRUN_SELECTED_SYSTEM="$system_size"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
+
+    read -r -p "Tamano SWAP [${default_swap}] : " swap_size < /dev/tty
+    swap_size="${swap_size:-$default_swap}"
+    DRYRUN_SELECTED_SWAP="$swap_size"
 
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
@@ -528,6 +541,7 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
     printf "[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
     printf "[dry-run] Sistema elegido: %s\n" "$system_size" > /dev/tty
+    printf "[dry-run] Swap elegido: %s\n" "$swap_size" > /dev/tty
     printf "[dry-run] Crear backup: %s\n" "$create_backup" > /dev/tty
     printf "[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
@@ -571,12 +585,13 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_SWAP_SIZE=\"$DRYRUN_SELECTED_SWAP\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
             "EFI elegido para la simulacion: $DRYRUN_SELECTED_EFI"
             "Sistema elegido para la simulacion: $DRYRUN_SELECTED_SYSTEM"
+            "Swap elegido para la simulacion: $DRYRUN_SELECTED_SWAP"
             "Crear backup: $DRYRUN_SELECTED_BACKUP"
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
