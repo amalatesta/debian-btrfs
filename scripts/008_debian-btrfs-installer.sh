@@ -926,9 +926,13 @@ ask_efi_in_plain_terminal() {
 
     clear > /dev/tty
     printf "\n[dry-run] modo de software base:\n" > /dev/tty
-    printf "[dry-run]   1) AUTO\n" > /dev/tty
-    printf "[dry-run]   2) INTERACTIVE\n" > /dev/tty
-    printf "[dry-run]   3) POSTBOOT\n\n" > /dev/tty
+    printf "[dry-run]   1) AUTO        (instala base + set estandar automaticamente)\n" > /dev/tty
+    printf "[dry-run]   2) INTERACTIVE (abre seleccion interactiva de paquetes/tareas)\n" > /dev/tty
+    printf "[dry-run]   3) POSTBOOT    (deja la instalacion minima; software despues del primer arranque)\n\n" > /dev/tty
+    printf "[dry-run] resumen rapido:\n" > /dev/tty
+    printf "[dry-run]   AUTO: para dejar el sistema util desde el primer reinicio.\n" > /dev/tty
+    printf "[dry-run]   INTERACTIVE: para elegir manualmente que instalar.\n" > /dev/tty
+    printf "[dry-run]   POSTBOOT: para instalar lo minimo y personalizar luego.\n\n" > /dev/tty
     read -r -p "Opcion [3]: " software_install_mode < /dev/tty
     software_install_mode="${software_install_mode:-3}"
     case "$software_install_mode" in
