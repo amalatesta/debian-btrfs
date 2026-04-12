@@ -7,7 +7,8 @@ set -euo pipefail
 #
 # Historial de mejoras
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
-# - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - Pendiente validacion
+# - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
+# - 0008.0003 - Opcion 2 primera parte (precheck dry-run) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -381,6 +382,44 @@ run_with_progress() {
     return "$rc"
 }
 
+run_dryrun_part1() {
+    local precheck_lines=(
+        "Modo prueba - primera parte"
+        ""
+        "Se va a validar el script base de dry-run:"
+        "  scripts/006_debian-btrfs-installer.sh"
+        ""
+        "Esta prueba NO toca disco."
+    )
+
+    show_info_box "DRY-RUN | PARTE 1" precheck_lines "ENTER/Esc/q: continuar" "normal"
+
+    if [[ ! -f "scripts/006_debian-btrfs-installer.sh" ]]; then
+        local missing_lines=(
+            "No se encontro el archivo requerido:"
+            "scripts/006_debian-btrfs-installer.sh"
+            ""
+            "Verifica el repo y vuelve a intentar."
+        )
+        show_error_box missing_lines
+        return 1
+    fi
+
+    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar precheck de dry-run ahora?" 0; then
+        return 0
+    fi
+
+    if run_with_progress "DRY-RUN | PRECHECK" "bash -n scripts/006_debian-btrfs-installer.sh" "Precheck OK: sintaxis valida en 006." "Precheck fallo: revisar sintaxis en 006."; then
+        local ok_lines=(
+            "Primera parte completada."
+            ""
+            "Siguiente paso: integrar ejecucion controlada"
+            "del dry-run desde este menu."
+        )
+        show_success_box ok_lines
+    fi
+}
+
 init_palette() {
     C_RESET="$(tput sgr0 2>/dev/null || true)"
 
@@ -751,7 +790,7 @@ main() {
                 show_command_preview "INSTALACION (PREVIEW)" "bash scripts/005_debian-btrfs-installer.sh" "En siguientes iteraciones se ejecutara desde este flujo."
                 ;;
             1)
-                show_command_preview "DRY-RUN (PREVIEW)" "bash scripts/006_debian-btrfs-installer.sh --dry-run" "Pendiente unificar flags y salida en esta UI."
+                run_dryrun_part1
                 ;;
             2)
                 show_help_screen
