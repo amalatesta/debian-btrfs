@@ -52,11 +52,10 @@ Documenta lo completado, en progreso y lo proyectado.
 - Validado en VM el flujo de idioma, ubicación, teclado y resumen
 - Confirmado el formato Sugerido --> / Elegido --> en terminal y reporte
 
-### 0008.0009 - Red inicial (pendiente validación)
-- Detectar si hay interfaz ethernet disponible
-- Detectar si solo hay wifi y ofrecer conexión asistida
-- Verificar herramientas disponibles (`nmcli`, `nmtui`, `iwctl`, `wpa_supplicant`)
-- Confirmar conectividad real antes de continuar con instalación o dry-run ampliado
+### 0008.0009 - Red inicial (OK por requisito)
+- Se cierra el tema red como requisito del entorno
+- La instalación debe contar con salida a Internet, preferentemente por Ethernet
+- Si el live arranca solo con Wi-Fi, queda fuera del alcance validado de esta iteración
 
 ---
 
@@ -206,9 +205,9 @@ bash scripts/008_debian-btrfs-installer.sh
 | aa66817 | 0008.0008 | Resumen con formato Sugerido/Elegido |
 | 8509282 | 0008.0008 | Prompt de Backup con formato `[S/n]` |
 | bd6166e | 0008.0008 | Limpieza del informe UI en `dry_run.sh` |
-| (actual) | 0008.0008-OK | Cierre de 0008 y apertura de 0008.0009 |
+| (actual) | 0008.0009-OK | Red cerrada como requisito de Internet/Ethernet |
 | 92417ca | - | README.md bitácora inicial |
-| (próximo) | 0008.0009 | Soporte inicial de red para ethernet/wifi |
+| (próximo) | - | Definir siguiente iteración funcional |
 
 ---
 

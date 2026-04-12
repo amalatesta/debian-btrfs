@@ -24,7 +24,6 @@ SUGGESTED_KEYBOARD_SOURCE="heuristica"
 NETWORK_DEFAULT_ROUTE="N"
 NETWORK_WIFI_IFACE=""
 NETWORK_ETH_IFACE=""
-NETWORK_WIFI_TOOL=""
 NETWORK_DNS_OK="N"
 CREATE_BACKUP="S"
 SELECTED_EFI_SIZE=""
@@ -476,68 +475,9 @@ detect_storage() {
     fi
 
     local disks_count nvme_count ssd_count hdd_count
-
-    analyze_network() {
-        step "7/9 - Estado de red (ethernet/wifi)"
-
-        if ! have_cmd ip; then
-            warn "ip no disponible; analisis de red limitado"
-            return 0
-        fi
-
-        local iface_path iface_name
-        for iface_path in /sys/class/net/*; do
-            iface_name="${iface_path##*/}"
-            [[ "$iface_name" == "lo" ]] && continue
-            if [[ -d "$iface_path/wireless" ]]; then
-                NETWORK_WIFI_IFACE="$iface_name"
-            elif [[ -f "$iface_path/carrier" ]] && [[ "$(cat "$iface_path/carrier" 2>/dev/null || true)" == "1" ]]; then
-                NETWORK_ETH_IFACE="$iface_name"
-            fi
-        done
-
-        if ip route show default 2>/dev/null | grep -q .; then
-            NETWORK_DEFAULT_ROUTE="S"
-        fi
-
-        if have_cmd nmtui; then
-            NETWORK_WIFI_TOOL="nmtui"
-        elif have_cmd nmcli; then
-            NETWORK_WIFI_TOOL="nmcli"
-        elif have_cmd iwctl; then
-            NETWORK_WIFI_TOOL="iwctl"
-        elif have_cmd wpa_supplicant; then
-            NETWORK_WIFI_TOOL="wpa_supplicant"
-        fi
-
-        if have_cmd getent && getent hosts deb.debian.org >/dev/null 2>&1; then
-            NETWORK_DNS_OK="S"
-        fi
-
-        printf "[dry-run] interfaz ethernet: %s\n" "${NETWORK_ETH_IFACE:-no detectada}"
-        printf "[dry-run] interfaz wifi: %s\n" "${NETWORK_WIFI_IFACE:-no detectada}"
-        printf "[dry-run] ruta por defecto: %s\n" "$NETWORK_DEFAULT_ROUTE"
-        printf "[dry-run] DNS funcional: %s\n" "$NETWORK_DNS_OK"
-
-        if [[ -n "$NETWORK_WIFI_TOOL" ]]; then
-            printf "[dry-run] herramienta wifi disponible: %s\n" "$NETWORK_WIFI_TOOL"
-        else
-            warn "sin herramienta Wi-Fi detectada (nmtui/nmcli/iwctl/wpa_supplicant)"
-        fi
-
-        if [[ "$NETWORK_DEFAULT_ROUTE" == "S" ]]; then
-            ok "red operativa para continuar"
-        elif [[ -n "$NETWORK_WIFI_IFACE" && -n "$NETWORK_WIFI_TOOL" ]]; then
-            warn "solo Wi-Fi disponible; el entorno podria conectarse con ${NETWORK_WIFI_TOOL}"
-        elif [[ -n "$NETWORK_WIFI_IFACE" ]]; then
-            warn "hay Wi-Fi, pero el entorno live no trae herramienta clara para conectarla"
-        else
-            warn "no se detecto conectividad lista"
-        fi
-    }
     disks_count="$(lsblk -d -n -o NAME 2>/dev/null | sed '/^$/d' | wc -l | awk '{print $1}')"
     nvme_count="$(lsblk -d -n -o NAME 2>/dev/null | grep -c '^nvme' || true)"
-        step "8/9 - Calculo de sugerencias como opcion 1"
+    ssd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==0{c++} END{print c+0}')"
     hdd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==1{c++} END{print c+0}')"
 
     printf "[dry-run] discos detectados: %s\n" "$disks_count"
@@ -554,6 +494,50 @@ detect_storage() {
     printf "[dry-run] particiones EFI detectadas (aprox): %s\n" "$efi_parts"
 
     detect_suggested_disk || true
+}
+
+analyze_network() {
+    step "7/9 - Estado de red (requisito del entorno)"
+
+    if ! have_cmd ip; then
+        warn "ip no disponible; analisis de red limitado"
+        return 0
+    fi
+
+    local iface_path iface_name
+    for iface_path in /sys/class/net/*; do
+        iface_name="${iface_path##*/}"
+        [[ "$iface_name" == "lo" ]] && continue
+        if [[ -d "$iface_path/wireless" ]]; then
+            NETWORK_WIFI_IFACE="$iface_name"
+        elif [[ -f "$iface_path/carrier" ]] && [[ "$(cat "$iface_path/carrier" 2>/dev/null || true)" == "1" ]]; then
+            NETWORK_ETH_IFACE="$iface_name"
+        fi
+    done
+
+    if ip route show default 2>/dev/null | grep -q .; then
+        NETWORK_DEFAULT_ROUTE="S"
+    fi
+
+    if have_cmd getent && getent hosts deb.debian.org >/dev/null 2>&1; then
+        NETWORK_DNS_OK="S"
+    fi
+
+    printf "[dry-run] interfaz ethernet: %s\n" "${NETWORK_ETH_IFACE:-no detectada}"
+    printf "[dry-run] interfaz wifi: %s\n" "${NETWORK_WIFI_IFACE:-no detectada}"
+    printf "[dry-run] ruta por defecto: %s\n" "$NETWORK_DEFAULT_ROUTE"
+    printf "[dry-run] DNS funcional: %s\n" "$NETWORK_DNS_OK"
+    printf "[dry-run] requisito actual: salida a Internet preferentemente por Ethernet\n"
+
+    if [[ "$NETWORK_DEFAULT_ROUTE" == "S" ]]; then
+        ok "red operativa para continuar"
+    elif [[ -n "$NETWORK_ETH_IFACE" ]]; then
+        warn "hay interfaz ethernet, pero sin conectividad valida"
+    elif [[ -n "$NETWORK_WIFI_IFACE" ]]; then
+        warn "hay Wi-Fi detectada, pero este flujo queda como requisito del entorno live"
+    else
+        warn "sin conectividad lista; la instalacion debe asumir Ethernet/Internet como requisito"
+    fi
 }
 
 print_preview_plan() {
