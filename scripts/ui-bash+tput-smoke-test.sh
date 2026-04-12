@@ -23,6 +23,25 @@ trap cleanup EXIT INT TERM
 
 tput civis
 
+# Paleta simple con fallback si la terminal no soporta color.
+if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
+    C_RESET="$(tput sgr0)"
+    C_BORDER="$(tput setaf 6)"
+    C_TITLE="$(tput bold)$(tput setaf 3)"
+    C_PROMPT="$(tput setaf 2)"
+    C_TEXT="$(tput setaf 7)"
+    C_HELP="$(tput setaf 4)"
+    C_OPT_NORMAL="$(tput setaf 6)"
+else
+    C_RESET=""
+    C_BORDER=""
+    C_TITLE=""
+    C_PROMPT=""
+    C_TEXT=""
+    C_HELP=""
+    C_OPT_NORMAL=""
+fi
+
 TITLE="Test UI bash+tput"
 PROMPT="Selecciona una opcion:"
 OPTIONS=(
@@ -73,9 +92,11 @@ draw_box_line() {
     local col="$2"
     local width="$3"
     tput cup "$row" "$col"
+    printf "%s" "$C_BORDER"
     printf "+"
     printf '%*s' $((width - 2)) '' | tr ' ' '-'
     printf "+"
+    printf "%s" "$C_RESET"
 }
 
 draw_ui() {
@@ -101,18 +122,24 @@ draw_ui() {
     local i
     for ((i = 1; i < box_h - 1; i++)); do
         tput cup $((start_row + i)) "$start_col"
+        printf "%s" "$C_BORDER"
         printf "|"
         tput cup $((start_row + i)) $((start_col + box_w - 1))
         printf "|"
+        printf "%s" "$C_RESET"
     done
 
     draw_box_line $((start_row + box_h - 1)) "$start_col" "$box_w"
 
     tput cup $((start_row + 1)) $((start_col + 2))
+    printf "%s" "$C_TITLE"
     printf "%s" "$TITLE"
+    printf "%s" "$C_RESET"
 
     tput cup $((start_row + 3)) $((start_col + 2))
+    printf "%s" "$C_PROMPT"
     printf "%s" "$PROMPT"
+    printf "%s" "$C_RESET"
 
     local opt_row
     for i in "${!OPTIONS[@]}"; do
@@ -126,7 +153,9 @@ draw_ui() {
             printf " %-60s " "${OPTIONS[$i]}"
             tput sgr0
         else
+            printf "%s" "$C_OPT_NORMAL"
             printf " %-60s " "${OPTIONS[$i]}"
+            printf "%s" "$C_RESET"
         fi
     done
 
@@ -142,7 +171,9 @@ draw_ui() {
         printf "< %s >" "${BUTTONS[0]}"
         tput sgr0
     else
+        printf "%s" "$C_TEXT"
         printf "< %s >" "${BUTTONS[0]}"
+        printf "%s" "$C_RESET"
     fi
 
     tput cup "$btn_row" "$btn_col_cancel"
@@ -152,11 +183,15 @@ draw_ui() {
         printf "< %s >" "${BUTTONS[1]}"
         tput sgr0
     else
+        printf "%s" "$C_TEXT"
         printf "< %s >" "${BUTTONS[1]}"
+        printf "%s" "$C_RESET"
     fi
 
     tput cup $((start_row + box_h - 2)) $((start_col + 2))
+    printf "%s" "$C_HELP"
     printf "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir"
+    printf "%s" "$C_RESET"
 }
 
 while true; do
