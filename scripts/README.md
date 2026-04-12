@@ -48,11 +48,15 @@ Documenta lo completado, en progreso y lo proyectado.
 
 ## 🔄 Trabajo en Progreso
 
-### 0008.0004 - Opción 2 ampliada (pendiente validación)
-- Ejecutar validación en VM del flujo completo ampliado
-- Confirmar salida esperada en escenarios con y sin root
-- Marcar OK solo después de validación manual
-- Luego abrir 0008.0005 con chequeos guiados de disco objetivo
+### 0008.0008 - Preguntas iniciales tipo Debian (OK)
+- Validado en VM el flujo de idioma, ubicación, teclado y resumen
+- Confirmado el formato Sugerido --> / Elegido --> en terminal y reporte
+
+### 0009.0001 - Red inicial (pendiente validación)
+- Detectar si hay interfaz ethernet disponible
+- Detectar si solo hay wifi y ofrecer conexión asistida
+- Verificar herramientas disponibles (`nmcli`, `nmtui`, `iwctl`, `wpa_supplicant`)
+- Confirmar conectividad real antes de continuar con instalación o dry-run ampliado
 
 ---
 
@@ -198,10 +202,13 @@ bash scripts/008_debian-btrfs-installer.sh
 | 419f884 | 0008.0002-b | Perfiles de pantalla (compact/normal/wide) |
 | 69d819c | 0008.0003 | Opción 2 → dry_run.sh |
 | 688ce67 | 0008.0003-OK | Marca 0003-OK, abre 0004 |
-| (pendiente) | 0008.0004 | Opción 2 ampliada, pendiente validación en VM |
+| d79a2c8 | 0008.0008 | Resumen ordenado y sin redundancia |
+| aa66817 | 0008.0008 | Resumen con formato Sugerido/Elegido |
+| 8509282 | 0008.0008 | Prompt de Backup con formato `[S/n]` |
+| bd6166e | 0008.0008 | Limpieza del informe UI en `dry_run.sh` |
+| (actual) | 0008.0008-OK | Cierre de 0008 y apertura de 0009.0001 |
 | 92417ca | - | README.md bitácora inicial |
-| (pendiente) | README | Restructuración a bitácora explícita |
-| (próximo) | 0008.0004 | Decisión próxima fase |
+| (próximo) | 0009.0001 | Soporte inicial de red para ethernet/wifi |
 
 ---
 

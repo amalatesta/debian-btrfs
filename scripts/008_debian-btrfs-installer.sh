@@ -13,7 +13,8 @@ set -euo pipefail
 # - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - OK
 # - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - OK
 # - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - OK
-# - 0008.0008 - Preguntas iniciales tipo Debian (locale/teclado/timezone) - Pendiente validacion
+# - 0008.0008 - Preguntas iniciales tipo Debian (locale/teclado/timezone) - OK
+# - 0009.0001 - Deteccion y preparacion de red (ethernet/wifi) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
