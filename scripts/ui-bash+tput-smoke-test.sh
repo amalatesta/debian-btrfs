@@ -257,8 +257,9 @@ while true; do
                     focus="list"
                     confirm_armed=0
                 else
-                    result="Cancelado"
-                    break
+                    # Cancelar vuelve a la lista (no salir del smoke test).
+                    focus="list"
+                    confirm_armed=0
                 fi
             fi
             ;;
