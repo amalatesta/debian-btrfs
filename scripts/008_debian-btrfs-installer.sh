@@ -495,6 +495,7 @@ ask_efi_in_plain_terminal() {
     local default_timezone="UTC"
     local default_keyboard="us"
     local default_keyboard_source="heuristica"
+    local run_keyboard_selector=""
     local install_temp_tools=""
 
     restore_terminal
@@ -513,6 +514,33 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_KEYBOARD_SOURCE) default_keyboard_source="$value" ;;
         esac
     done <<< "$defaults_output"
+
+    if command -v dpkg-reconfigure >/dev/null 2>&1; then
+        clear > /dev/tty
+        printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+        printf "[dry-run] se puede abrir el selector real de teclado de Debian.\n\n" > /dev/tty
+        read -r -p "Abrir selector de teclado ahora? [s/N]: " run_keyboard_selector < /dev/tty
+        run_keyboard_selector="${run_keyboard_selector^^}"
+
+        if [[ "$run_keyboard_selector" == "S" ]]; then
+            clear > /dev/tty
+            printf "[dry-run] abriendo selector de teclado...\n" > /dev/tty
+            if [[ "$(id -u)" -eq 0 ]]; then
+                dpkg-reconfigure keyboard-configuration < /dev/tty > /dev/tty 2>&1 || true
+                setupcon < /dev/tty > /dev/tty 2>&1 || true
+            else
+                sudo dpkg-reconfigure keyboard-configuration < /dev/tty > /dev/tty 2>&1 || true
+                sudo setupcon < /dev/tty > /dev/tty 2>&1 || true
+            fi
+
+            local detected_keyboard_after_selector
+            detected_keyboard_after_selector="$(awk -F= '/^XKBLAYOUT=/{gsub(/"/,"",$2); print $2; exit}' /etc/default/keyboard 2>/dev/null || true)"
+            if [[ -n "$detected_keyboard_after_selector" ]]; then
+                default_keyboard="$detected_keyboard_after_selector"
+                default_keyboard_source="selector-debian"
+            fi
+        fi
+    fi
 
     if [[ -z "$default_keyboard" ]] && [[ "$default_locale" == es_* ]]; then
         default_keyboard="es"
