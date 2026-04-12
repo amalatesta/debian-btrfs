@@ -48,11 +48,11 @@ Documenta lo completado, en progreso y lo proyectado.
 
 ## 🔄 Trabajo en Progreso
 
-### 0008.0005 - Chequeos guiados de disco objetivo
-- Definir selección segura del disco candidato (solo preview)
-- Agregar recomendaciones contextuales según hardware detectado
-- Manteniendo patrón modular de 008
-- Plan: preparar puente con opción 1 sin ejecutar cambios reales
+### 0008.0004 - Opción 2 ampliada (pendiente validación)
+- Ejecutar validación en VM del flujo completo ampliado
+- Confirmar salida esperada en escenarios con y sin root
+- Marcar OK solo después de validación manual
+- Luego abrir 0008.0005 con chequeos guiados de disco objetivo
 
 ---
 
@@ -198,7 +198,7 @@ bash scripts/008_debian-btrfs-installer.sh
 | 419f884 | 0008.0002-b | Perfiles de pantalla (compact/normal/wide) |
 | 69d819c | 0008.0003 | Opción 2 → dry_run.sh |
 | 688ce67 | 0008.0003-OK | Marca 0003-OK, abre 0004 |
-| (pendiente) | 0008.0004-OK | Opción 2 ampliada y validada localmente |
+| (pendiente) | 0008.0004 | Opción 2 ampliada, pendiente validación en VM |
 | 92417ca | - | README.md bitácora inicial |
 | (pendiente) | README | Restructuración a bitácora explícita |
 | (próximo) | 0008.0004 | Decisión próxima fase |
@@ -237,4 +237,4 @@ Flujo de cambios:
 
 ---
 
-**Última actualización**: 2026-04-12 (0008.0004 cerrado, 0008.0005 en preparación)
+**Última actualización**: 2026-04-12 (0008.0004 en validación)
