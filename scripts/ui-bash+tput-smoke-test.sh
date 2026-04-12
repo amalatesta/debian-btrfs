@@ -361,12 +361,20 @@ handle_key() {
     case "$key" in
         UP)
             if [[ "$focus" == "list" ]]; then
-                (( selected_option > 0 )) && selected_option=$((selected_option - 1))
+                if (( selected_option > 0 )); then
+                    selected_option=$((selected_option - 1))
+                else
+                    selected_option=$((${#OPTIONS[@]} - 1))
+                fi
             fi
             ;;
         DOWN)
             if [[ "$focus" == "list" ]]; then
-                (( selected_option < ${#OPTIONS[@]} - 1 )) && selected_option=$((selected_option + 1))
+                if (( selected_option < ${#OPTIONS[@]} - 1 )); then
+                    selected_option=$((selected_option + 1))
+                else
+                    selected_option=0
+                fi
             fi
             ;;
         LEFT)
