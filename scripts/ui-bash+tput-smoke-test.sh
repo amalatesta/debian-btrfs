@@ -246,8 +246,9 @@ while true; do
                         printf "Resultado: Salir\n"
                         exit 0
                     fi
-                    result="${OPTIONS[$selected_option]}"
-                    break
+                    # Para opciones 1-3, Aceptar no cierra este smoke test.
+                    # Vuelve el foco a la lista para seguir navegando.
+                    focus="list"
                 else
                     result="Cancelado"
                     break
