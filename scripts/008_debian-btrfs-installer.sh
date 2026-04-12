@@ -27,6 +27,7 @@ MAIN_OPTIONS=(
     "Salir"
 )
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OPTION1_SCRIPT="install.sh"
 OPTION2_SCRIPT="dry_run.sh"
 
 THEME_TITLE="Seleccion de Color"
@@ -1035,6 +1036,71 @@ ask_efi_in_plain_terminal() {
     return 0
 }
 
+run_install_part1() {
+    local option1_path="${SCRIPT_DIR}/${OPTION1_SCRIPT}"
+    local precheck_lines=(
+        "Instalacion real de Debian"
+        ""
+        "Se ejecutara el instalador:"
+        "  ${OPTION1_SCRIPT}"
+        ""
+        "Las preguntas de disco y password se hacen"
+        "dentro del instalador, en terminal limpia."
+        "Al finalizar el sistema se reiniciara."
+        ""
+        "ADVERTENCIA: se borrara el disco seleccionado."
+    )
+
+    show_info_box "INSTALAR" precheck_lines "ENTER/Esc/q: continuar" "normal"
+
+    if [[ ! -f "$option1_path" ]]; then
+        local missing_lines=(
+            "No se encontro el archivo requerido:"
+            "$OPTION1_SCRIPT"
+            ""
+            "Verifica el repo y vuelve a intentar."
+        )
+        show_error_box missing_lines
+        return 1
+    fi
+
+    if ! confirm_yes_no "CONFIRMAR INSTALACION" "Iniciar la instalacion ahora?" 0; then
+        return 0
+    fi
+
+    if ! ask_efi_in_plain_terminal "$option1_path"; then
+        return 0
+    fi
+
+    # La instalacion cede el control total a install.sh en terminal limpia.
+    # No usamos run_with_report porque el instalador es interactivo (disco,
+    # password, progreso largo) y necesita stdout/stdin directos.
+    restore_terminal
+    clear
+    DRYRUN_LOCALE="$DRYRUN_SELECTED_LOCALE" \
+    DRYRUN_KEYBOARD="$DRYRUN_SELECTED_KEYBOARD" \
+    DRYRUN_TIMEZONE="$DRYRUN_SELECTED_TIMEZONE" \
+    DRYRUN_HOSTNAME="$DRYRUN_SELECTED_HOSTNAME" \
+    DRYRUN_USERNAME="$DRYRUN_SELECTED_USERNAME" \
+    DRYRUN_APT_ENABLE_NONFREE="$DRYRUN_SELECTED_APT_ENABLE_NONFREE" \
+    DRYRUN_APT_ENABLE_SECURITY="$DRYRUN_SELECTED_APT_ENABLE_SECURITY" \
+    DRYRUN_APT_ENABLE_UPDATES="$DRYRUN_SELECTED_APT_ENABLE_UPDATES" \
+    DRYRUN_APT_ENABLE_DEBSRC="$DRYRUN_SELECTED_APT_ENABLE_DEBSRC" \
+    DRYRUN_APT_PROXY="$DRYRUN_SELECTED_APT_PROXY" \
+    DRYRUN_INSTALL_NONFREE_FIRMWARE="$DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE" \
+    DRYRUN_ENABLE_POPCON="$DRYRUN_SELECTED_ENABLE_POPCON" \
+    DRYRUN_SOFTWARE_INSTALL_MODE="$DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE" \
+    DRYRUN_INSTALL_SSH_IN_BASE="$DRYRUN_SELECTED_INSTALL_SSH_IN_BASE" \
+    DRYRUN_INSTALL_TASKSEL_NOW="$DRYRUN_SELECTED_INSTALL_TASKSEL_NOW" \
+    DRYRUN_EFI_SIZE="$DRYRUN_SELECTED_EFI" \
+    DRYRUN_SYSTEM_SIZE="$DRYRUN_SELECTED_SYSTEM" \
+    DRYRUN_SWAP_SIZE="$DRYRUN_SELECTED_SWAP" \
+    DRYRUN_CREATE_BACKUP="$DRYRUN_SELECTED_BACKUP" \
+    bash "$option1_path"
+    # Si install.sh termina sin reboot (cancelacion), volvemos a la UI
+    setup_terminal
+}
+
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
@@ -1458,7 +1524,7 @@ main() {
 
         case "$MENU_SELECTED" in
             0)
-                show_command_preview "INSTALACION (PREVIEW)" "bash scripts/005_debian-btrfs-installer.sh" "En siguientes iteraciones se ejecutara desde este flujo."
+                run_install_part1
                 ;;
             1)
                 run_dryrun_part1
