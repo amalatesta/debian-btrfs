@@ -583,6 +583,8 @@ ask_efi_in_plain_terminal() {
     local software_install_mode="POSTBOOT" suggested_software_install_mode="POSTBOOT"
     local install_ssh_in_base="S" suggested_install_ssh_in_base="S"
     local install_tasksel_now="N" suggested_install_tasksel_now="N"
+    local user_password=""
+    local user_password_confirm=""
     local defaults_output key value
     local default_efi="1G"
     local default_system="64G"
@@ -795,8 +797,7 @@ ask_efi_in_plain_terminal() {
         fi
     fi
 
-    read -r -p "Teclado [${default_keyboard}] : " keyboard_value < /dev/tty
-    keyboard_value="${keyboard_value:-$default_keyboard}"
+    keyboard_value="$default_keyboard"
     DRYRUN_SELECTED_KEYBOARD="$keyboard_value"
 
     clear > /dev/tty
@@ -818,14 +819,28 @@ ask_efi_in_plain_terminal() {
     username_value="${username_value:-usuario}"
     DRYRUN_SELECTED_USERNAME="$username_value"
 
-    clear > /dev/tty
-    printf "\n[dry-run] password de usuario:\n\n" > /dev/tty
-    read -r -p "Password definida para ${username_value}? [S/n]: " user_password_set < /dev/tty
-    user_password_set="${user_password_set:-S}"
-    user_password_set="${user_password_set^^}"
-    if [[ "$user_password_set" != "S" ]]; then
-        user_password_set="N"
-    fi
+    while true; do
+        clear > /dev/tty
+        printf "\n[dry-run] password de usuario:\n\n" > /dev/tty
+        read -r -s -p "Password para ${username_value}: " user_password < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ -z "$user_password" ]]; then
+            printf "[dry-run] La password no puede estar vacia.\n" > /dev/tty
+            sleep 0.8
+            continue
+        fi
+
+        read -r -s -p "Confirmar password: " user_password_confirm < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ "$user_password" != "$user_password_confirm" ]]; then
+            printf "[dry-run] Las passwords no coinciden. Reintenta.\n" > /dev/tty
+            sleep 0.8
+            continue
+        fi
+
+        user_password_set="S"
+        break
+    done
     DRYRUN_SELECTED_USER_PASSWORD_SET="$user_password_set"
 
     clear > /dev/tty
