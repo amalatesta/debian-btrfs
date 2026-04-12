@@ -7,7 +7,7 @@ set -euo pipefail
 #
 # Historial de mejoras
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
-# - 0008.0002 - Opcion 3 Ayuda funcional
+# - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -22,6 +22,7 @@ MAIN_OPTIONS=(
 THEME_TITLE="Seleccion de Color"
 THEME_PROMPT="Elige una paleta para continuar:"
 THEME_OPTIONS=("Blanco" "Naranja" "Verde")
+YES_NO_OPTIONS=("Si" "No")
 BUTTONS=("Aceptar" "Cancelar")
 
 BOX_W=76
@@ -67,29 +68,175 @@ cleanup() {
 }
 
 show_help_screen() {
-    restore_terminal
+    local HELP_LINES=(
+        "Este es un prototipo de interfaz en bash+tput."
+        ""
+        "Navegacion:"
+        "  - Flechas arriba/abajo: mover opcion"
+        "  - TAB / izquierda-derecha: mover foco"
+        "  - ENTER: seleccionar o confirmar"
+        ""
+        "Estado actual:"
+        "  - Opcion 3: abre esta ayuda"
+        "  - Opcion 4: salir del script"
+        "  - Opciones 1 y 2: en construccion"
+    )
+
+    show_centered_text_box "AYUDA - Debian Btrfs Installer v008" HELP_LINES "ENTER/Esc/q: volver al menu"
+}
+
+show_centered_text_box() {
+    local title="$1"
+    local lines_name="$2"
+    local footer="$3"
+    local -n lines_ref="$lines_name"
+    local key
+
+    while true; do
+        draw_centered_text_frame "$title" "$lines_name" "$footer"
+
+        key="$(get_key_raw)"
+        case "$key" in
+            ENTER|ESC|QUIT)
+                return 0
+                ;;
+        esac
+    done
+}
+
+draw_centered_text_frame() {
+    local title="$1"
+    local lines_name="$2"
+    local footer="$3"
+    local -n lines_ref="$lines_name"
+    local i line line_row content_width max_lines
+
+    calc_layout
     clear
-    cat << 'EOF'
-============================================
-DEBIAN BTRFS INSTALLER v008 - AYUDA
-============================================
+    draw_frame
 
-Este es un prototipo de interfaz en bash+tput.
+    tput cup $((START_ROW + 1)) $((START_COL + 2))
+    printf "%s%s%s" "$C_TITLE" "$title" "$C_RESET"
 
-Navegacion del menu principal:
-- Flechas arriba/abajo: mover opcion
-- TAB / Flechas izquierda-derecha: mover foco a botones
-- ENTER: confirmar seleccion
-- q: salir
+    content_width=$((BOX_W - 4))
+    max_lines=$((BOX_H - 6))
+    for ((i = 0; i < ${#lines_ref[@]} && i < max_lines; i++)); do
+        line="${lines_ref[$i]}"
+        line_row=$((START_ROW + 3 + i))
+        tput cup "$line_row" $((START_COL + 2))
+        printf "%s%-*.*s%s" "$C_TEXT" "$content_width" "$content_width" "$line" "$C_RESET"
+    done
 
-Flujo actual:
-- Opcion 3 (Ayuda): muestra esta pantalla y vuelve al menu.
-- Opcion 4 (Salir): finaliza el script al confirmar.
-- Opciones 1 y 2: placeholder (sin accion real por ahora).
+    tput cup $((START_ROW + BOX_H - 2)) $((START_COL + 2))
+    printf "%s%s%s" "$C_HELP" "$footer" "$C_RESET"
+}
 
-EOF
-    read -r -p "Presiona ENTER para volver al menu... " _
-    setup_terminal
+show_info_box() {
+    local title="$1"
+    local lines_name="$2"
+    local footer="${3:-ENTER/Esc/q: volver}"
+    show_centered_text_box "$title" "$lines_name" "$footer"
+}
+
+show_message_box() {
+    local title="$1"
+    local message="$2"
+    local footer="${3:-ENTER/Esc/q: volver}"
+    local MSG_LINES=("$message")
+
+    show_info_box "$title" MSG_LINES "$footer"
+}
+
+show_todo_screen() {
+    local feature_name="$1"
+    local TODO_LINES=(
+        "${feature_name}"
+        ""
+        "Esta parte se implementara en una proxima iteracion."
+        "La UI ya esta preparada para reutilizar este cuadro."
+    )
+
+    show_info_box "EN CONSTRUCCION" TODO_LINES "ENTER/Esc/q: volver al menu"
+}
+
+show_success_box() {
+    local lines_name="$1"
+    show_info_box "OK" "$lines_name" "ENTER/Esc/q: continuar"
+}
+
+show_error_box() {
+    local lines_name="$1"
+    show_info_box "ERROR" "$lines_name" "ENTER/Esc/q: volver"
+}
+
+show_command_preview() {
+    local title="$1"
+    local command="$2"
+    local note="${3:-Revisar antes de ejecutar.}"
+    local PREVIEW_LINES=(
+        "Comando previsto:"
+        ""
+        "$command"
+        ""
+        "$note"
+    )
+
+    show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu"
+}
+
+confirm_yes_no() {
+    local title="$1"
+    local prompt="$2"
+    local default_selected="${3:-1}"
+
+    run_menu "$title" "$prompt" YES_NO_OPTIONS 0 0 "Flechas: mover | ENTER: confirmar | Esc/q: cancelar" 0 "$default_selected"
+
+    if [[ "$MENU_EVENT" == "QUIT" ]]; then
+        return 1
+    fi
+
+    [[ "$MENU_SELECTED" -eq 0 ]]
+}
+
+run_with_progress() {
+    local title="$1"
+    local command="$2"
+    local success_note="${3:-Comando finalizado correctamente.}"
+    local error_note="${4:-El comando termino con error.}"
+    local log_file rc
+
+    log_file="$(mktemp)"
+
+    (bash -lc "$command" >"$log_file" 2>&1)
+    rc=$?
+
+    local OUTPUT_LINES=(
+        "Comando ejecutado:"
+        ""
+        "$command"
+        ""
+        "Codigo de salida: $rc"
+    )
+
+    if [[ "$rc" -eq 0 ]]; then
+        OUTPUT_LINES+=("" "$success_note")
+        show_success_box OUTPUT_LINES
+    else
+        OUTPUT_LINES+=("" "$error_note")
+        show_error_box OUTPUT_LINES
+    fi
+
+    # Muestra una vista resumida de salida para diagnostico rapido.
+    mapfile -t OUTPUT_TAIL < <(tail -n 6 "$log_file" 2>/dev/null || true)
+    if (( ${#OUTPUT_TAIL[@]} > 0 )); then
+        local TAIL_LINES=("Ultimas lineas de salida:" "")
+        TAIL_LINES+=("${OUTPUT_TAIL[@]}")
+        show_info_box "SALIDA (RESUMEN)" TAIL_LINES "ENTER/Esc/q: volver"
+    fi
+
+    rm -f "$log_file"
+
+    return "$rc"
 }
 
 init_palette() {
@@ -193,6 +340,16 @@ get_key_raw() {
             "[C") echo "RIGHT" ;;
             "[D") echo "LEFT" ;;
             "OM") echo "ENTER" ;;
+            "Op") echo "DIGIT:0" ;;
+            "Oq") echo "DIGIT:1" ;;
+            "Or") echo "DIGIT:2" ;;
+            "Os") echo "DIGIT:3" ;;
+            "Ot") echo "DIGIT:4" ;;
+            "Ou") echo "DIGIT:5" ;;
+            "Ov") echo "DIGIT:6" ;;
+            "Ow") echo "DIGIT:7" ;;
+            "Ox") echo "DIGIT:8" ;;
+            "Oy") echo "DIGIT:9" ;;
             *) echo "ESC" ;;
         esac
         return 0
@@ -445,7 +602,7 @@ main() {
     esac
 
     while true; do
-        run_menu "$MAIN_TITLE" "$MAIN_PROMPT" MAIN_OPTIONS 1 0 "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | q: salir" 1 0
+        run_menu "$MAIN_TITLE" "$MAIN_PROMPT" MAIN_OPTIONS 1 1 "Flechas: mover | TAB: foco | ENTER: seleccionar/confirmar | 1-4 directo | q: salir" 1 0
 
         if [[ "$MENU_EVENT" == "QUIT" ]]; then
             result="Cancelado"
@@ -453,15 +610,20 @@ main() {
         fi
 
         case "$MENU_SELECTED" in
+            0)
+                show_command_preview "INSTALACION (PREVIEW)" "bash scripts/005_debian-btrfs-installer.sh" "En siguientes iteraciones se ejecutara desde este flujo."
+                ;;
+            1)
+                show_command_preview "DRY-RUN (PREVIEW)" "bash scripts/006_debian-btrfs-installer.sh --dry-run" "Pendiente unificar flags y salida en esta UI."
+                ;;
             2)
                 show_help_screen
                 ;;
             3)
-                result="Salir"
-                break
-                ;;
-            *)
-                # Opciones 1 y 2 quedan como placeholders por ahora.
+                if confirm_yes_no "CONFIRMAR SALIDA" "Deseas salir del instalador?" 1; then
+                    result="Salir"
+                    break
+                fi
                 ;;
         esac
     done
