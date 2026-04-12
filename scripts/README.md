@@ -52,7 +52,7 @@ Documenta lo completado, en progreso y lo proyectado.
 - Validado en VM el flujo de idioma, ubicación, teclado y resumen
 - Confirmado el formato Sugerido --> / Elegido --> en terminal y reporte
 
-### 0009.0001 - Red inicial (pendiente validación)
+### 0008.0009 - Red inicial (pendiente validación)
 - Detectar si hay interfaz ethernet disponible
 - Detectar si solo hay wifi y ofrecer conexión asistida
 - Verificar herramientas disponibles (`nmcli`, `nmtui`, `iwctl`, `wpa_supplicant`)
@@ -206,9 +206,9 @@ bash scripts/008_debian-btrfs-installer.sh
 | aa66817 | 0008.0008 | Resumen con formato Sugerido/Elegido |
 | 8509282 | 0008.0008 | Prompt de Backup con formato `[S/n]` |
 | bd6166e | 0008.0008 | Limpieza del informe UI en `dry_run.sh` |
-| (actual) | 0008.0008-OK | Cierre de 0008 y apertura de 0009.0001 |
+| (actual) | 0008.0008-OK | Cierre de 0008 y apertura de 0008.0009 |
 | 92417ca | - | README.md bitácora inicial |
-| (próximo) | 0009.0001 | Soporte inicial de red para ethernet/wifi |
+| (próximo) | 0008.0009 | Soporte inicial de red para ethernet/wifi |
 
 ---
 

@@ -21,6 +21,11 @@ SUGGESTED_LOCALE=""
 SUGGESTED_HOSTNAME="debian-pc"
 SUGGESTED_KEYBOARD="us"
 SUGGESTED_KEYBOARD_SOURCE="heuristica"
+NETWORK_DEFAULT_ROUTE="N"
+NETWORK_WIFI_IFACE=""
+NETWORK_ETH_IFACE=""
+NETWORK_WIFI_TOOL=""
+NETWORK_DNS_OK="N"
 CREATE_BACKUP="S"
 SELECTED_EFI_SIZE=""
 SELECTED_EFI_GB=1
@@ -207,7 +212,7 @@ print_defaults() {
 }
 
 analyze_memory() {
-    step "1/8 - Analisis de memoria"
+    step "1/9 - Analisis de memoria"
 
     if [[ ! -f /proc/meminfo ]]; then
         warn "no se puede leer /proc/meminfo"
@@ -249,7 +254,7 @@ analyze_memory() {
 }
 
 analyze_cpu() {
-    step "2/8 - Analisis de CPU"
+    step "2/9 - Analisis de CPU"
 
     if [[ ! -f /proc/cpuinfo ]]; then
         warn "no se puede leer /proc/cpuinfo"
@@ -370,7 +375,7 @@ print_header() {
 }
 
 check_environment() {
-    step "3/8 - Validaciones de entorno"
+    step "3/9 - Validaciones de entorno"
 
     if ! have_cmd bash; then
         fail "bash no disponible"
@@ -409,7 +414,7 @@ check_environment() {
 }
 
 detect_runtime_context() {
-    step "4/8 - Contexto de ejecucion"
+    step "4/9 - Contexto de ejecucion"
 
     local kernel user uid_value root_fs root_src
     kernel="$(uname -sr 2>/dev/null || echo desconocido)"
@@ -434,7 +439,7 @@ detect_runtime_context() {
 }
 
 verify_disk_space() {
-    step "5/8 - Verificacion de espacio en disco"
+    step "5/9 - Verificacion de espacio en disco"
 
     if ! have_cmd df; then
         warn "df no disponible; verificacion saltada"
@@ -463,7 +468,7 @@ verify_disk_space() {
 }
 
 detect_storage() {
-    step "6/8 - Deteccion de hardware y particiones"
+    step "6/9 - Deteccion de hardware y particiones"
 
     if ! have_cmd lsblk; then
         warn "omitiendo deteccion de discos porque lsblk no esta disponible"
@@ -471,9 +476,68 @@ detect_storage() {
     fi
 
     local disks_count nvme_count ssd_count hdd_count
+
+    analyze_network() {
+        step "7/9 - Estado de red (ethernet/wifi)"
+
+        if ! have_cmd ip; then
+            warn "ip no disponible; analisis de red limitado"
+            return 0
+        fi
+
+        local iface_path iface_name
+        for iface_path in /sys/class/net/*; do
+            iface_name="${iface_path##*/}"
+            [[ "$iface_name" == "lo" ]] && continue
+            if [[ -d "$iface_path/wireless" ]]; then
+                NETWORK_WIFI_IFACE="$iface_name"
+            elif [[ -f "$iface_path/carrier" ]] && [[ "$(cat "$iface_path/carrier" 2>/dev/null || true)" == "1" ]]; then
+                NETWORK_ETH_IFACE="$iface_name"
+            fi
+        done
+
+        if ip route show default 2>/dev/null | grep -q .; then
+            NETWORK_DEFAULT_ROUTE="S"
+        fi
+
+        if have_cmd nmtui; then
+            NETWORK_WIFI_TOOL="nmtui"
+        elif have_cmd nmcli; then
+            NETWORK_WIFI_TOOL="nmcli"
+        elif have_cmd iwctl; then
+            NETWORK_WIFI_TOOL="iwctl"
+        elif have_cmd wpa_supplicant; then
+            NETWORK_WIFI_TOOL="wpa_supplicant"
+        fi
+
+        if have_cmd getent && getent hosts deb.debian.org >/dev/null 2>&1; then
+            NETWORK_DNS_OK="S"
+        fi
+
+        printf "[dry-run] interfaz ethernet: %s\n" "${NETWORK_ETH_IFACE:-no detectada}"
+        printf "[dry-run] interfaz wifi: %s\n" "${NETWORK_WIFI_IFACE:-no detectada}"
+        printf "[dry-run] ruta por defecto: %s\n" "$NETWORK_DEFAULT_ROUTE"
+        printf "[dry-run] DNS funcional: %s\n" "$NETWORK_DNS_OK"
+
+        if [[ -n "$NETWORK_WIFI_TOOL" ]]; then
+            printf "[dry-run] herramienta wifi disponible: %s\n" "$NETWORK_WIFI_TOOL"
+        else
+            warn "sin herramienta Wi-Fi detectada (nmtui/nmcli/iwctl/wpa_supplicant)"
+        fi
+
+        if [[ "$NETWORK_DEFAULT_ROUTE" == "S" ]]; then
+            ok "red operativa para continuar"
+        elif [[ -n "$NETWORK_WIFI_IFACE" && -n "$NETWORK_WIFI_TOOL" ]]; then
+            warn "solo Wi-Fi disponible; el entorno podria conectarse con ${NETWORK_WIFI_TOOL}"
+        elif [[ -n "$NETWORK_WIFI_IFACE" ]]; then
+            warn "hay Wi-Fi, pero el entorno live no trae herramienta clara para conectarla"
+        else
+            warn "no se detecto conectividad lista"
+        fi
+    }
     disks_count="$(lsblk -d -n -o NAME 2>/dev/null | sed '/^$/d' | wc -l | awk '{print $1}')"
     nvme_count="$(lsblk -d -n -o NAME 2>/dev/null | grep -c '^nvme' || true)"
-    ssd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==0{c++} END{print c+0}')"
+        step "8/9 - Calculo de sugerencias como opcion 1"
     hdd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==1{c++} END{print c+0}')"
 
     printf "[dry-run] discos detectados: %s\n" "$disks_count"
@@ -493,109 +557,54 @@ detect_storage() {
 }
 
 print_preview_plan() {
-        step "8/8 - Simulacion del plan de instalacion"
+    step "9/9 - Simulacion del plan de instalacion"
 
-        printf "\n[dry-run] === PLAN DE PARTICIONES ===\n\n"
-        printf "[dry-run] EFI:\n"
-        printf "[dry-run]   Sugerido --> %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
-        printf "[dry-run]   Elegido  --> %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
-        printf "\n[dry-run] SISTEMA (BTRFS raiz):\n"
-        printf "[dry-run]   Sugerido --> %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
-        printf "[dry-run]   Elegido  --> %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
-        printf "\n[dry-run] BACKUP (BTRFS opcional):\n"
-        if [[ "$CREATE_BACKUP" == "S" ]]; then
-            printf "[dry-run]   Sugerido --> %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
-        else
-            printf "[dry-run]   Sugerido --> omitida por espacio\n"
-        fi
-        if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
-            printf "[dry-run]   Elegido  --> %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
-        else
-            printf "[dry-run]   Elegido  --> omitida\n"
-        fi
+    printf "\n[dry-run] === PLAN DE PARTICIONES ===\n\n"
+    printf "[dry-run] EFI:\n"
+    printf "[dry-run]   Sugerido --> %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
+    printf "[dry-run]   Elegido  --> %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
 
-        cat <<'EOF'
+    printf "\n[dry-run] SISTEMA (BTRFS raiz):\n"
+    printf "[dry-run]   Sugerido --> %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
+    printf "[dry-run]   Elegido  --> %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
 
-    [dry-run] === SUBVOLUMENES BTRFS ===
-    [dry-run]   - @           -> raiz del sistema (/)
-    [dry-run]   - @home       -> datos de usuario (/home)
-    [dry-run]   - @snapshots  -> base para snapshots (/.snapshots)
-    [dry-run]   - @swap       -> contenedor del swapfile
-    EOF
-
-        printf "\n[dry-run] === SWAP ===\n"
-        printf "[dry-run]   Sugerido --> %s   (en subvol @swap)\n" "$DEFAULT_SWAP_SIZE"
-        printf "[dry-run]   Elegido  --> %s   (en subvol @swap)\n" "$SELECTED_SWAP_SIZE"
-
-        cat <<'EOF'
-
-    [dry-run] === PASO A PASO EN INSTALACION REAL ===
-    [dry-run]   1) Confirmar disco objetivo y schema GPT/UEFI
-    [dry-run]   2) Crear/validar particiones (EFI, SISTEMA, BACKUP)
-    [dry-run]   3) Crear subvolumenes estándar (@, @home, @snapshots, @swap)
-    [dry-run]   4) Montar con opciones de rendimiento y generar fstab
-    [dry-run]   5) Instalar sistema base + Grub + herramientas Btrfs
-    [dry-run]   6) Validar arranque y preparar snapshots iniciales
-
-    [dry-run] === COMANDOS DE REFERENCIA ===
-    [dry-run]   - lsblk -f                      (ver estructura)
-    [dry-run]   - blkid                         (verificar particiones)
-    [dry-run]   - btrfs subvolume list /        (ver subvolumenes)
-    [dry-run]   - mount | grep btrfs           (ver montajes activos)
-    EOF
-    step "8/8 - Resultado simulado si aceptaras los recomendados"
-
-    cat <<'EOF'
-[dry-run] que se haria en instalacion real:
-[dry-run]   1) confirmar disco objetivo y esquema GPT/UEFI.
-[dry-run]   2) crear/validar particiones EFI + raiz btrfs (+ opcional recovery).
-[dry-run]   3) crear subvolumenes estandar: @ y @home.
-[dry-run]   4) montar con opciones recomendadas y generar fstab.
-[dry-run]   5) instalar sistema base + grub + herramientas snapshot.
-[dry-run]   6) validar arranque y preparar rollback.
-EOF
-
-    printf "\n[dry-run] simulacion de resultado esperado (informativo):\n"
-    printf "[dry-run]   disco elegido por defecto: %s\n" "$DISK"
-    printf "[dry-run]   --- sugerido ---\n"
-    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
-    printf "[dry-run]   particion 2: SISTEMA   %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
+    printf "\n[dry-run] BACKUP (BTRFS opcional):\n"
     if [[ "$CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
+        printf "[dry-run]   Sugerido --> %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
     else
-        printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
+        printf "[dry-run]   Sugerido --> omitida por espacio\n"
     fi
-    printf "[dry-run]   --- final (segun respuestas) ---\n"
-    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
-    printf "[dry-run]   particion 2: SISTEMA   %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
     if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
+        printf "[dry-run]   Elegido  --> %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
     else
-        printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
+        printf "[dry-run]   Elegido  --> omitida\n"
     fi
 
-    cat <<'EOF'
-[dry-run]
-[dry-run]   subvolumenes propuestos dentro de BTRFS:
-[dry-run]     - @           -> raiz del sistema
-[dry-run]     - @home       -> datos de usuario
-[dry-run]     - @snapshots  -> base sugerida para snapshots
-[dry-run]     - @swap       -> contenedor del swapfile
-[dry-run]
-[dry-run]   montaje esperado:
-[dry-run]     - /           -> subvol=@
-[dry-run]     - /home       -> subvol=@home
-[dry-run]     - /.snapshots -> subvol=@snapshots
-EOF
-
-    printf "[dry-run]     - /var/swap   -> subvol=@swap (swapfile %s)\n" "$SELECTED_SWAP_SIZE"
+    printf "\n[dry-run] === SWAP ===\n"
+    printf "[dry-run]   Sugerido --> %s   (en subvol @swap)\n" "$SUGGESTED_SWAP"
+    printf "[dry-run]   Elegido  --> %s   (en subvol @swap)\n" "$SELECTED_SWAP_SIZE"
 
     cat <<'EOF'
-[dry-run] comandos de referencia (no ejecutados):
-[dry-run]   - lsblk -f
-[dry-run]   - blkid
-[dry-run]   - btrfs subvolume list /
-[dry-run]   - mount | grep btrfs
+
+[dry-run] === SUBVOLUMENES BTRFS ===
+[dry-run]   - @           -> raiz del sistema (/)
+[dry-run]   - @home       -> datos de usuario (/home)
+[dry-run]   - @snapshots  -> base para snapshots (/.snapshots)
+[dry-run]   - @swap       -> contenedor del swapfile
+
+[dry-run] === PASO A PASO EN INSTALACION REAL ===
+[dry-run]   1) Confirmar disco objetivo y schema GPT/UEFI
+[dry-run]   2) Crear/validar particiones (EFI, SISTEMA, BACKUP)
+[dry-run]   3) Crear subvolumenes estándar (@, @home, @snapshots, @swap)
+[dry-run]   4) Montar con opciones de rendimiento y generar fstab
+[dry-run]   5) Instalar sistema base + Grub + herramientas Btrfs
+[dry-run]   6) Validar arranque y preparar snapshots iniciales
+
+[dry-run] === COMANDOS DE REFERENCIA ===
+[dry-run]   - lsblk -f               (ver estructura)
+[dry-run]   - blkid                  (verificar particiones)
+[dry-run]   - btrfs subvolume list / (ver subvolumenes)
+[dry-run]   - mount | grep btrfs     (ver montajes activos)
 EOF
 
     ok "preview generado sin operaciones destructivas"
@@ -614,6 +623,8 @@ main() {
     verify_disk_space
     printf "\n"
     detect_storage
+    printf "\n"
+    analyze_network
     printf "\n"
     analyze_and_suggest
     printf "\n"

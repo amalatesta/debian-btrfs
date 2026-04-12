@@ -14,7 +14,7 @@ set -euo pipefail
 # - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - OK
 # - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - OK
 # - 0008.0008 - Preguntas iniciales tipo Debian (locale/teclado/timezone) - OK
-# - 0009.0001 - Deteccion y preparacion de red (ethernet/wifi) - Pendiente validacion
+# - 0008.0009 - Deteccion y preparacion de red (ethernet/wifi) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -478,6 +478,131 @@ run_with_report() {
     return "$rc"
 }
 
+network_has_default_route() {
+    command -v ip >/dev/null 2>&1 || return 1
+    ip route show default 2>/dev/null | grep -q .
+}
+
+network_detect_wifi_iface() {
+    local iface_path iface_name
+    for iface_path in /sys/class/net/*; do
+        iface_name="${iface_path##*/}"
+        [[ "$iface_name" == "lo" ]] && continue
+        if [[ -d "$iface_path/wireless" ]]; then
+            printf '%s\n' "$iface_name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+network_detect_ethernet_link() {
+    local iface_path iface_name carrier
+    for iface_path in /sys/class/net/*; do
+        iface_name="${iface_path##*/}"
+        [[ "$iface_name" == "lo" ]] && continue
+        [[ -d "$iface_path/wireless" ]] && continue
+        [[ -f "$iface_path/carrier" ]] || continue
+        carrier="$(cat "$iface_path/carrier" 2>/dev/null || true)"
+        if [[ "$carrier" == "1" ]]; then
+            printf '%s\n' "$iface_name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+prepare_network_in_plain_terminal() {
+    local wifi_iface=""
+    local ethernet_iface=""
+    local prepare_wifi=""
+    local recommended_tool=""
+    local wifi_ssid=""
+    local wifi_password=""
+
+    wifi_iface="$(network_detect_wifi_iface || true)"
+    ethernet_iface="$(network_detect_ethernet_link || true)"
+
+    clear > /dev/tty
+    printf "\n[dry-run] red previa al analisis:\n\n" > /dev/tty
+
+    if network_has_default_route; then
+        printf "[dry-run] Red activa detectada. No hace falta preparar conectividad.\n" > /dev/tty
+        [[ -n "$ethernet_iface" ]] && printf "[dry-run] Ethernet con enlace: %s\n" "$ethernet_iface" > /dev/tty
+        [[ -n "$wifi_iface" ]] && printf "[dry-run] Wi-Fi detectada: %s\n" "$wifi_iface" > /dev/tty
+        printf "\n[dry-run] continuando con la simulacion...\n" > /dev/tty
+        sleep 0.6
+        return 0
+    fi
+
+    [[ -n "$ethernet_iface" ]] && printf "[dry-run] Ethernet detectada con enlace: %s\n" "$ethernet_iface" > /dev/tty
+    [[ -n "$wifi_iface" ]] && printf "[dry-run] Wi-Fi detectada: %s\n" "$wifi_iface" > /dev/tty
+
+    if [[ -z "$wifi_iface" ]]; then
+        printf "[dry-run] No se detecto interfaz Wi-Fi.\n" > /dev/tty
+        sleep 0.6
+        return 0
+    fi
+
+    if command -v nmtui >/dev/null 2>&1; then
+        recommended_tool="nmtui"
+    elif command -v nmcli >/dev/null 2>&1; then
+        recommended_tool="nmcli"
+    elif command -v iwctl >/dev/null 2>&1; then
+        recommended_tool="iwctl"
+    fi
+
+    if [[ -z "$recommended_tool" ]]; then
+        printf "[dry-run] Hay Wi-Fi, pero no hay herramienta soportada (nmtui/nmcli/iwctl).\n" > /dev/tty
+        printf "[dry-run] Esto queda como requisito del entorno live.\n" > /dev/tty
+        sleep 1
+        return 0
+    fi
+
+    printf "[dry-run] Herramienta sugerida: %s\n\n" "$recommended_tool" > /dev/tty
+    read -r -p "Intentar configurar Wi-Fi ahora? [S/n]: " prepare_wifi < /dev/tty
+    prepare_wifi="${prepare_wifi:-S}"
+    prepare_wifi="${prepare_wifi^^}"
+    if [[ "$prepare_wifi" == "N" ]]; then
+        return 0
+    fi
+
+    case "$recommended_tool" in
+        nmtui)
+            clear > /dev/tty
+            printf "[dry-run] abriendo nmtui para conectar Wi-Fi...\n" > /dev/tty
+            nmtui < /dev/tty > /dev/tty 2>&1 || true
+            ;;
+        nmcli)
+            clear > /dev/tty
+            printf "[dry-run] redes Wi-Fi detectadas:\n" > /dev/tty
+            nmcli -f IN-USE,SSID,SIGNAL,SECURITY device wifi list ifname "$wifi_iface" 2>/dev/null | sed 's/^/[dry-run]   /' > /dev/tty || true
+            printf "\n" > /dev/tty
+            read -r -p "SSID: " wifi_ssid < /dev/tty
+            read -r -s -p "Clave Wi-Fi: " wifi_password < /dev/tty
+            printf "\n" > /dev/tty
+            if [[ -n "$wifi_ssid" ]]; then
+                nmcli device wifi connect "$wifi_ssid" password "$wifi_password" ifname "$wifi_iface" > /dev/tty 2>&1 || true
+            fi
+            ;;
+        iwctl)
+            clear > /dev/tty
+            printf "[dry-run] abriendo iwctl para conectar Wi-Fi...\n" > /dev/tty
+            iwctl < /dev/tty > /dev/tty 2>&1 || true
+            ;;
+    esac
+
+    clear > /dev/tty
+    printf "\n[dry-run] verificacion posterior de red:\n\n" > /dev/tty
+    if network_has_default_route; then
+        printf "[dry-run] Conectividad detectada. La red parece lista para continuar.\n" > /dev/tty
+    else
+        printf "[dry-run] No se detecto ruta por defecto tras el intento de conexion.\n" > /dev/tty
+        printf "[dry-run] Si el entorno live no levanta Wi-Fi, queda como requisito del medio.\n" > /dev/tty
+    fi
+    sleep 1
+}
+
 ask_efi_in_plain_terminal() {
     local option2_path="$1"
     local locale_value=""
@@ -520,6 +645,8 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_KEYBOARD_SOURCE) default_keyboard_source="$value" ;;
         esac
     done <<< "$defaults_output"
+
+    prepare_network_in_plain_terminal
 
     clear > /dev/tty
     printf "\n[dry-run] idioma (estilo Debian):\n" > /dev/tty
