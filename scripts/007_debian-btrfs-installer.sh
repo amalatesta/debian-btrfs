@@ -455,11 +455,8 @@ ui_after_dialog() {
         return 0
     fi
 
-    # Mensaje breve de transición para confirmar que se aceptó la acción
-    # y que el instalador pasa automáticamente al siguiente paso.
+    # No-op: el infobox de transicion genera pantalla negra/flicker en algunas VMs.
     stty sane 2>/dev/null || true
-    whiptail --title "Procesando" --infobox "Cargando siguiente paso..." 8 50
-    sleep 0.15
     return 0
 }
 
@@ -569,10 +566,7 @@ ask_input() {
         fi
         answer="$(cat "$tmp_answer")"
         rm -f "$tmp_answer"
-        answer="${answer//$'\r'/}"
-        answer="${answer//$'\n'/}"
-        answer="${answer#"${answer%%[![:space:]]*}"}"
-        answer="${answer%"${answer##*[![:space:]]}"}"
+        answer="$(sanitize_dialog_value "$answer")"
         [[ -z "$answer" ]] && answer="$default_value"
         ui_after_dialog
         ui_redraw_tty
@@ -598,6 +592,7 @@ ask_password() {
         fi
         answer="$(cat "$tmp_answer")"
         rm -f "$tmp_answer"
+        answer="$(sanitize_dialog_value "$answer")"
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
@@ -678,10 +673,8 @@ ask_menu() {
         fi
         answer="$(cat "$tmp_answer")"
         rm -f "$tmp_answer"
-        answer="${answer//$'\r'/}"
-        answer="${answer//$'\n'/}"
-        answer="${answer#"${answer%%[![:space:]]*}"}"
-        answer="${answer%"${answer##*[![:space:]]}"}"
+        answer="$(sanitize_dialog_value "$answer")"
+        [[ -z "$answer" ]] && answer="$default_value"
         ui_redraw_tty
         echo "$answer"
     else
@@ -735,10 +728,6 @@ startup_wizard() {
     WIZARD_ACTION=""
 
     while true; do
-        if [[ "$USE_WHIPTAIL" == "S" ]]; then
-            clear
-        fi
-
         action="$(ask_menu "Debian Btrfs Installer" "Seleccione una opcion." "1" \
             "1" "Iniciar instalacion" \
             "2" "Modo prueba (dry-run)" \
@@ -750,7 +739,8 @@ startup_wizard() {
 
         # En algunos entornos TTY/whiptail pueden aparecer CR/LF o espacios residuales.
         # Normalizamos para que el case siempre reciba una opcion limpia (1-4).
-        action="$(printf '%s' "$action" | tr -d '\r\n' | xargs)"
+        action="$(sanitize_dialog_value "$action")"
+        action="$(printf '%s' "$action" | grep -o '[1-4]' | head -n1 || true)"
 
         if [[ -z "$action" ]]; then
             continue
@@ -768,7 +758,6 @@ startup_wizard() {
             3)
                 if [[ "$USE_WHIPTAIL" == "S" ]]; then
                     ui_textbox_from_text "Ayuda" "$(show_usage)"
-                    clear
                 else
                     separator
                     show_usage
@@ -1016,6 +1005,18 @@ normalize_size_gib() {
     echo "$value"
 }
 
+sanitize_dialog_value() {
+    local value="${1-}"
+
+    # Elimina secuencias ANSI/CSI que algunas TTY agregan al cerrar dialogs.
+    value="$(printf '%s' "$value" | sed -E $'s/\x1B\[[0-9;?]*[ -/]*[@-~]//g; s/\x1B[@-_]//g')"
+    value="${value//$'\r'/}"
+    value="${value//$'\n'/}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
 debug_value_repr() {
     local value="${1-}"
     local shell_escaped hex_bytes printable
@@ -1163,7 +1164,9 @@ show_dry_run_step() {
         return 0
     fi
 
-    clear
+    if [[ "$USE_WHIPTAIL" != "S" ]]; then
+        clear
+    fi
     separator
     echo "MODO PRUEBA - PASO ${step_number}/${total_steps}"
     separator
