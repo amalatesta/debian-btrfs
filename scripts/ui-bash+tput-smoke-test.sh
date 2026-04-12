@@ -139,8 +139,14 @@ calc_layout() {
 }
 
 get_key() {
-    local k rest
-    IFS= read -rsn1 k || true
+    local k rest read_status
+    IFS= read -rsn1 k
+    read_status=$?
+
+    if [[ $read_status -ne 0 ]]; then
+        echo "OTHER"
+        return 0
+    fi
 
     if [[ -z "${k:-}" ]]; then
         echo "ENTER"
@@ -372,7 +378,8 @@ handle_key() {
         TAB)
             if [[ "$focus" == "list" ]]; then
                 focus="buttons"
-                confirm_armed=1
+                # TAB solo mueve foco. No debe habilitar salida por Enter.
+                confirm_armed=0
             else
                 focus="list"
                 confirm_armed=0
