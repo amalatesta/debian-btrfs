@@ -521,11 +521,7 @@ ask_efi_in_plain_terminal() {
     done <<< "$defaults_output"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] orden estilo instalador Debian\n\n" > /dev/tty
-    printf "[dry-run] 1) Idioma\n" > /dev/tty
-    printf "[dry-run] 2) Pais / ubicacion\n" > /dev/tty
-    printf "[dry-run] 3) Teclado\n\n" > /dev/tty
+    printf "\n[dry-run] idioma (estilo Debian):\n" > /dev/tty
 
     case "$default_locale" in
         es_*) language_code="es" ;;
@@ -534,10 +530,6 @@ ask_efi_in_plain_terminal() {
         de_*) language_code="de" ;;
         *) language_code="en" ;;
     esac
-
-    clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] idioma (estilo Debian):\n" > /dev/tty
     printf "[dry-run]   1) Espanol\n" > /dev/tty
     printf "[dry-run]   2) English\n" > /dev/tty
     printf "[dry-run]   3) Portugues\n" > /dev/tty
@@ -571,8 +563,7 @@ ask_efi_in_plain_terminal() {
     esac
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] pais / ubicacion (estilo Debian):\n" > /dev/tty
+    printf "\n[dry-run] pais / ubicacion:\n" > /dev/tty
     printf "[dry-run]   1) Argentina\n" > /dev/tty
     printf "[dry-run]   2) Espana\n" > /dev/tty
     printf "[dry-run]   3) Mexico\n" > /dev/tty
@@ -633,8 +624,7 @@ ask_efi_in_plain_terminal() {
 
     if command -v dpkg-reconfigure >/dev/null 2>&1; then
         clear > /dev/tty
-        printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-        printf "[dry-run] se puede abrir el selector real de teclado de Debian.\n\n" > /dev/tty
+        printf "\n[dry-run] se puede abrir selector real de Debian.\n\n" > /dev/tty
         printf "[dry-run] Nota: si ese selector muestra opciones no deseadas, luego\n" > /dev/tty
         printf "[dry-run] podras elegir rapido es/latam/us manualmente.\n\n" > /dev/tty
         read -r -p "Abrir selector de teclado ahora? [s/N]: " run_keyboard_selector < /dev/tty
@@ -661,8 +651,7 @@ ask_efi_in_plain_terminal() {
     fi
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] selector rapido de teclado:\n" > /dev/tty
+    printf "\n[dry-run] selector rapido de teclado:\n" > /dev/tty
     printf "[dry-run]   1) es\n" > /dev/tty
     printf "[dry-run]   2) latam\n" > /dev/tty
     printf "[dry-run]   3) us\n" > /dev/tty
@@ -678,8 +667,7 @@ ask_efi_in_plain_terminal() {
 
     if [[ "$default_keyboard_source" != "system-file" ]]; then
         clear > /dev/tty
-        printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-        printf "[dry-run] no se detecto teclado del sistema con certeza.\n" > /dev/tty
+        printf "\n[dry-run] confirmacion: no se detecto teclado del sistema.\n" > /dev/tty
         printf "[dry-run] se puede instalar temporalmente (solo en Live) para mejorar deteccion.\n\n" > /dev/tty
         read -r -p "Instalar temporalmente herramientas de teclado? [s/N]: " install_temp_tools < /dev/tty
         install_temp_tools="${install_temp_tools^^}"
@@ -707,43 +695,31 @@ ask_efi_in_plain_terminal() {
     DRYRUN_SELECTED_KEYBOARD="$keyboard_value"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] timezone derivada por ubicacion\n\n" > /dev/tty
+    printf "\n[dry-run] timezone (derivada por ubicacion):\n\n" > /dev/tty
     read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
     timezone_value="${timezone_value:-$default_timezone}"
     DRYRUN_SELECTED_TIMEZONE="$timezone_value"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-
-    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
+    printf "\n[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
     read -r -p "Tamano EFI [${default_efi}] : " efi_size < /dev/tty
     efi_size="${efi_size:-$default_efi}"
     DRYRUN_SELECTED_EFI="$efi_size"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
-
+    printf "\n[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
     read -r -p "Tamano SISTEMA [${default_system}] : " system_size < /dev/tty
     system_size="${system_size:-$default_system}"
     DRYRUN_SELECTED_SYSTEM="$system_size"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
-
+    printf "\n[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
     read -r -p "Tamano SWAP [${default_swap}] : " swap_size < /dev/tty
     swap_size="${swap_size:-$default_swap}"
     DRYRUN_SELECTED_SWAP="$swap_size"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-
+    printf "\n" > /dev/tty
     read -r -p "Crear particion BACKUP? [${default_backup}]: " create_backup < /dev/tty
     create_backup="${create_backup:-$default_backup}"
     create_backup="${create_backup^^}"
@@ -753,18 +729,17 @@ ask_efi_in_plain_terminal() {
     DRYRUN_SELECTED_BACKUP="$create_backup"
 
     clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-    printf "[dry-run] Idioma elegido: %s\n" "$language_code" > /dev/tty
-    printf "[dry-run] Locale elegido: %s\n" "$locale_value" > /dev/tty
-    printf "[dry-run] Ubicacion elegida: %s\n" "$location_value" > /dev/tty
-    printf "[dry-run] Teclado elegido: %s\n" "$keyboard_value" > /dev/tty
-    printf "[dry-run] Timezone elegido: %s\n" "$timezone_value" > /dev/tty
-    printf "[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
-    printf "[dry-run] Sistema elegido: %s\n" "$system_size" > /dev/tty
-    printf "[dry-run] Swap elegido: %s\n" "$swap_size" > /dev/tty
-    printf "[dry-run] Crear backup: %s\n" "$create_backup" > /dev/tty
-    printf "[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
+    printf "\n[dry-run] RESUMEN DE CONFIGURACION:\n\n" > /dev/tty
+    printf "[dry-run] Idioma: %s\n" "$language_code" > /dev/tty
+    printf "[dry-run] Locale: %s\n" "$locale_value" > /dev/tty
+    printf "[dry-run] Ubicacion: %s\n" "$location_value" > /dev/tty
+    printf "[dry-run] Teclado: %s\n" "$keyboard_value" > /dev/tty
+    printf "[dry-run] Timezone: %s\n" "$timezone_value" > /dev/tty
+    printf "[dry-run] EFI: %s\n" "$efi_size" > /dev/tty
+    printf "[dry-run] Sistema: %s\n" "$system_size" > /dev/tty
+    printf "[dry-run] Swap: %s\n" "$swap_size" > /dev/tty
+    printf "[dry-run] Backup: %s\n" "$create_backup" > /dev/tty
+    printf "\n[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
 
     setup_terminal
