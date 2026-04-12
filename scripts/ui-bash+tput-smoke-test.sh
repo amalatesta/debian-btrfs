@@ -11,7 +11,7 @@ if [[ ! -t 0 || ! -t 1 ]]; then
     exit 1
 fi
 
-stty -echo -icanon time 0 min 0
+stty -echo -icanon min 1 time 0
 
 cleanup() {
     stty sane 2>/dev/null || true
@@ -26,13 +26,21 @@ tput civis
 # Paleta simple con fallback si la terminal no soporta color.
 if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
     C_RESET="$(tput sgr0)"
-    C_BORDER="$(tput setaf 2)"
-    C_TITLE="$(tput bold)$(tput setaf 2)"
-    C_PROMPT="$(tput setaf 2)"
-    C_TEXT="$(tput setaf 2)"
-    C_HELP="$(tput setaf 2)"
-    C_OPT_NORMAL="$(tput setaf 2)"
-    C_FOCUS="$(tput setaf 0)$(tput setab 2)"
+    # Verde "fosforo": usa verde brillante ANSI cuando hay >=16 colores.
+    if [[ "$(tput colors 2>/dev/null || echo 0)" -ge 16 ]]; then
+        C_GREEN="$(printf '\033[92m')"
+        C_BG_GREEN="$(printf '\033[102m')"
+    else
+        C_GREEN="$(tput setaf 2)"
+        C_BG_GREEN="$(tput setab 2)"
+    fi
+    C_BORDER="${C_GREEN}"
+    C_TITLE="$(tput bold)${C_GREEN}"
+    C_PROMPT="${C_GREEN}"
+    C_TEXT="${C_GREEN}"
+    C_HELP="${C_GREEN}"
+    C_OPT_NORMAL="${C_GREEN}"
+    C_FOCUS="$(tput setaf 0)${C_BG_GREEN}"
 else
     C_RESET=""
     C_BORDER=""
@@ -232,6 +240,11 @@ while true; do
                 selected_button=0
             else
                 if [[ $selected_button -eq 0 ]]; then
+                    if [[ $selected_option -eq 3 ]]; then
+                        cleanup
+                        printf "Resultado: Salir\n"
+                        exit 0
+                    fi
                     result="${OPTIONS[$selected_option]}"
                     break
                 else
@@ -248,7 +261,6 @@ while true; do
             ;;
     esac
 
-    sleep 0.02
 done
 
 cleanup
