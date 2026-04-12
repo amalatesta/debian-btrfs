@@ -517,40 +517,26 @@ run_with_report() {
     return "$rc"
 }
 
-run_dryrun_in_plain_terminal() {
-    local option2_path="$1"
+ask_efi_in_plain_terminal() {
     local efi_size=""
-    local rc=0
 
     restore_terminal
     clear
 
     printf "[dry-run] modo terminal (fuera del menu UI)\n"
-    printf "[dry-run] script: %s\n\n" "$option2_path"
+    printf "[dry-run] configuracion previa de simulacion\n\n"
 
     read -r -p "Tamano EFI para simulacion [1G]: " efi_size
     efi_size="${efi_size:-1G}"
 
-    printf "\n[dry-run] ejecutando analisis...\n\n"
-    if ! DRYRUN_EFI_SIZE="$efi_size" bash "$option2_path"; then
-        rc=$?
-    fi
-
-    printf "\n[dry-run] fin de ejecucion (codigo=%s)\n" "$rc"
-    read -r -p "Presiona ENTER para volver al menu..." _
+    printf "\n[dry-run] EFI elegido: %s\n" "$efi_size"
+    read -r -p "Presiona ENTER para volver a la UI y ver el informe..." _
 
     setup_terminal
     flush_input_buffer
 
-    local summary_lines=(
-        "Dry-run finalizado en modo terminal."
-        ""
-        "EFI usado en simulacion: $efi_size"
-        "Codigo de salida: $rc"
-    )
-    show_info_box "OK" summary_lines "ENTER/Esc/q: continuar" "normal"
-
-    return "$rc"
+    printf '%s\n' "$efi_size"
+    return 0
 }
 
 run_dryrun_part1() {
@@ -583,7 +569,20 @@ run_dryrun_part1() {
         return 0
     fi
 
-    run_dryrun_in_plain_terminal "$option2_path"
+    if ! efi_size="$(ask_efi_in_plain_terminal)"; then
+        return 0
+    fi
+
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$efi_size\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+        local ok_lines=(
+            "Ejecucion completada."
+            ""
+            "EFI elegido para la simulacion: $efi_size"
+            "Se mostro el informe completo del dry-run."
+            "No se realizaron cambios en disco."
+        )
+        show_info_box "OK" ok_lines "ENTER/Esc/q: continuar" "normal"
+    fi
 }
 
 init_palette() {
