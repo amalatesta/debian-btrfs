@@ -389,24 +389,15 @@ run_with_progress() {
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
-        "Modo prueba - analisis del sistema"
+        "Modo prueba (dry-run)"
         ""
-        "Este flujo NO toca disco y muestra primero:"
-        "  1) Analisis de memoria"
-        "  2) Analisis de CPU"
-        "  3) Validaciones de entorno"
-        "  4) Contexto de ejecucion"
-        "  5) Espacio en disco"
-        "  6) Hardware y particiones"
-        "  7) Preview de acciones"
-        ""
-        "Script ejecutado para el analisis:"
+        "Se ejecutara un script externo de diagnostico:"
         "  ${OPTION2_SCRIPT}"
         ""
-        "Resultado esperado: informe completo del estado actual."
+        "El detalle de pasos e informe se gestiona en ese script."
     )
 
-    show_info_box "DRY-RUN | DIAGNOSTICO" precheck_lines "ENTER/Esc/q: continuar" "wide-log"
+    show_info_box "DRY-RUN" precheck_lines "ENTER/Esc/q: continuar" "normal"
 
     if [[ ! -f "$option2_path" ]]; then
         local missing_lines=(
@@ -419,16 +410,15 @@ run_dryrun_part1() {
         return 1
     fi
 
-    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar opcion 2 (diagnostico completo) ahora?" 0; then
+    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar opcion 2 ahora?" 0; then
         return 0
     fi
 
-    if run_with_progress "DRY-RUN | DIAGNOSTICO" "bash \"$option2_path\"" "Analisis de opcion 2 completado." "Analisis de opcion 2 fallo."; then
+    if run_with_progress "DRY-RUN" "bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
-            "Diagnostico completado."
+            "Ejecucion completada."
             ""
-            "Siguiente paso (0008.0005):"
-            "interactividad de seleccion de disco y esquema."
+            "Revisa el resumen mostrado y vuelve al menu."
         )
         show_success_box ok_lines
     fi
