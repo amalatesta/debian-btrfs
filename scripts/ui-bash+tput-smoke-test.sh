@@ -66,6 +66,7 @@ selected_option=0
 selected_button=0
 focus="list"   # list | buttons
 confirm_armed=0
+exit_requested=0
 result=""
 
 get_key() {
@@ -249,14 +250,14 @@ while true; do
             else
                 if [[ $selected_button -eq 0 && $confirm_armed -eq 1 ]]; then
                     if [[ $selected_option -eq 3 ]]; then
-                        cleanup
-                        printf "Resultado: Salir\n"
-                        exit 0
+                        result="Salir"
+                        exit_requested=1
+                    else
+                        # Para opciones 1-3, Aceptar no cierra este smoke test.
+                        # Vuelve el foco a la lista para seguir navegando.
+                        focus="list"
+                        confirm_armed=0
                     fi
-                    # Para opciones 1-3, Aceptar no cierra este smoke test.
-                    # Vuelve el foco a la lista para seguir navegando.
-                    focus="list"
-                    confirm_armed=0
                 else
                     # Cancelar vuelve a la lista (no salir del smoke test).
                     focus="list"
@@ -271,11 +272,15 @@ while true; do
             ;;
         QUIT)
             result="Cancelado"
-            break
+            exit_requested=1
             ;;
         OTHER)
             ;;
     esac
+
+    if [[ $exit_requested -eq 1 ]]; then
+        break
+    fi
 
 done
 
