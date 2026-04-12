@@ -339,6 +339,12 @@ flush_input_buffer() {
     done
 }
 
+debounce_input() {
+    flush_input_buffer
+    sleep 0.15
+    flush_input_buffer
+}
+
 choose_efi_size() {
     local suggested="$1"
     local EFI_SIM_OPTIONS=(
@@ -349,7 +355,7 @@ choose_efi_size() {
         "Cancelar"
     )
 
-    flush_input_buffer
+    debounce_input
 
     run_menu "SIMULACION | EFI" "Elige tamano de EFI para simulacion" EFI_SIM_OPTIONS 0 0 "Flechas: mover | ENTER: confirmar | Esc/q: cancelar" 1 0
 
@@ -435,6 +441,8 @@ run_with_report() {
     local run_pid=$!
     local spinner=("|" "/" "-" "\\")
     local spin_idx=0
+    local frame_count=0
+    local min_frames=12
     local profile_spec
     local p_base_w p_base_h p_min_w p_min_h p_max_w p_max_h p_page_limit
     local STATUS_LINES
@@ -466,8 +474,9 @@ run_with_report() {
 
         draw_centered_text_frame "$title" STATUS_LINES "Procesando..." "$p_base_w" "$p_base_h" "$p_min_w" "$p_min_h" "$p_max_w" "$p_max_h"
         spin_idx=$(( (spin_idx + 1) % 4 ))
+        frame_count=$((frame_count + 1))
 
-        if ! kill -0 "$run_pid" 2>/dev/null; then
+        if ! kill -0 "$run_pid" 2>/dev/null && (( frame_count >= min_frames )); then
             break
         fi
 
