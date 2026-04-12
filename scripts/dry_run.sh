@@ -24,18 +24,94 @@ fail() {
     exit 1
 }
 
+info() {
+    printf "[dry-run][info] %s\n" "$1"
+}
+
 have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+analyze_memory() {
+    step "1/7 - Analisis de memoria\n"
+
+    if [[ ! -f /proc/meminfo ]]; then
+        warn "no se puede leer /proc/meminfo"
+        return 1
+    fi
+
+    local total_kb used_kb available_kb percent_used
+    total_kb="$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')"
+    available_kb="$(grep '^MemAvailable:' /proc/meminfo | awk '{print $2}')"
+    used_kb=$((total_kb - available_kb))
+    percent_used=$((100 * used_kb / total_kb))
+
+    local total_gb used_gb available_gb
+    total_gb=$((total_kb / 1024 / 1024))
+    used_gb=$((used_kb / 1024 / 1024))
+    available_gb=$((available_kb / 1024 / 1024))
+
+    printf "[dry-run] RAM total: %sGB\n" "$total_gb"
+    printf "[dry-run] RAM usada: %sGB (%s%%)\n" "$used_gb" "$percent_used"
+    printf "[dry-run] RAM disponible: %sGB\n" "$available_gb"
+
+    if (( available_gb < 2 )); then
+        warn "memoria insuficiente (<2GB); instalacion posible pero lenta"
+    else
+        ok "memoria suficiente"
+    fi
+
+    if [[ -f /proc/swaps ]]; then
+        local swap_total
+        swap_total="$(tail -n +2 /proc/swaps | awk '{sum+=$3} END{print sum}')"
+        if [[ -z "$swap_total" ]] || (( swap_total == 0 )); then
+            info "no hay swap configurado"
+        else
+            local swap_gb
+            swap_gb=$((swap_total / 1024 / 1024))
+            printf "[dry-run] swap disponible: %sGB\n" "$swap_gb"
+        fi
+    fi
+}
+
+analyze_cpu() {
+    step "2/7 - Analisis de CPU\n"
+
+    if [[ ! -f /proc/cpuinfo ]]; then
+        warn "no se puede leer /proc/cpuinfo"
+        return 1
+    fi
+
+    local cpu_count cpu_model
+    cpu_count="$(grep -c '^processor' /proc/cpuinfo)"
+    cpu_model="$(grep '^model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)"
+
+    printf "[dry-run] CPUs: %s\n" "$cpu_count"
+    printf "[dry-run] modelo: %s\n" "$cpu_model"
+
+    if (( cpu_count < 2 )); then
+        warn "CPU limitada (1 core); compilacion y instalacion seran lentas"
+    else
+        ok "CPU multiples cores disponibles"
+    fi
+
+    if have_cmd nproc; then
+        local available_procs
+        available_procs="$(nproc)"
+        printf "[dry-run] procesos paralelos disponibles: %s\n" "$available_procs"
+    fi
+}
+
 print_header() {
-    printf "[dry-run] inicio\n"
+    printf "[dry-run] === DEBIAN BTRFS INSTALLER - DRY-RUN ANALYSIS ===\n"
     printf "[dry-run] repo: %s\n" "$REPO_ROOT"
-    printf "[dry-run] objetivo: simular instalacion sin tocar disco\n"
+    printf "[dry-run] objetivo: validar sistema sin tocar disco\n"
+    printf "[dry-run] fecha: %s\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf "\n"
 }
 
 check_environment() {
-    step "1/4 - Validaciones de entorno"
+    step "3/7 - Validaciones de entorno"
 
     if ! have_cmd bash; then
         fail "bash no disponible"
@@ -74,7 +150,7 @@ check_environment() {
 }
 
 detect_runtime_context() {
-    step "2/4 - Contexto de ejecucion"
+    step "4/7 - Contexto de ejecucion"
 
     local kernel user uid_value root_fs root_src
     kernel="$(uname -sr 2>/dev/null || echo desconocido)"
@@ -98,8 +174,37 @@ detect_runtime_context() {
     fi
 }
 
+verify_disk_space() {
+    step "5/7 - Verificacion de espacio en disco"
+
+    if ! have_cmd df; then
+        warn "df no disponible; verificacion saltada"
+        return 0
+    fi
+
+    local root_available root_size
+    root_available="$(df -BG / 2>/dev/null | awk 'NR==2{print $4}' | sed 's/G$//')"
+    root_size="$(df -BG / 2>/dev/null | awk 'NR==2{print $2}' | sed 's/G$//')"
+
+    printf "[dry-run] espacio total en /: %sGB\n" "$root_size"
+    printf "[dry-run] espacio disponible en /: %sGB\n" "$root_available"
+
+    local min_required
+    min_required=20
+
+    if (( root_available < min_required )); then
+        warn "espacio insuficiente (<${min_required}GB); instalacion dificil o imposible"
+    else
+        ok "espacio suficiente para instalacion"
+    fi
+
+    if (( root_available < 50 )); then
+        info "recomendacion: considerar espacio >= 50GB para comodidad"
+    fi
+}
+
 detect_storage() {
-    step "3/4 - Deteccion de hardware y particiones"
+    step "6/7 - Deteccion de hardware y particiones"
 
     if ! have_cmd lsblk; then
         warn "omitiendo deteccion de discos porque lsblk no esta disponible"
@@ -127,7 +232,7 @@ detect_storage() {
 }
 
 print_preview_plan() {
-    step "4/4 - Preview de acciones (simuladas)"
+    step "7/7 - Preview de acciones (simuladas)"
 
     cat <<'EOF'
 [dry-run] que se haria en instalacion real:
@@ -152,12 +257,23 @@ EOF
 
 main() {
     print_header
+    analyze_memory
+    printf "\n"
+    analyze_cpu
+    printf "\n"
     check_environment
+    printf "\n"
     detect_runtime_context
+    printf "\n"
+    verify_disk_space
+    printf "\n"
     detect_storage
+    printf "\n"
     print_preview_plan
 
-    printf "\n[dry-run] resultado: completado\n"
+    printf "\n[dry-run] ==========================================\n"
+    printf "[dry-run] RESULTADO: Analisis completado exitosamente\n"
+    printf "[dry-run] ==========================================\n"
 }
 
 main
