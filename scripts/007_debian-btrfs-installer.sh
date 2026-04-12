@@ -1489,7 +1489,8 @@ detect_disks() {
             done
             selection="$(ask_menu "Seleccion de Disco" "Selecciona el disco destino" "1" "${menu_options[@]}")" || error "Seleccion de disco cancelada"
         else
-            read -r -p "Selecciona disco [1-${#disks[@]}]: " selection
+            read -r -p "Selecciona disco [1-${#disks[@]}] (default 1): " selection </dev/tty
+            selection="${selection:-1}"
         fi
 
         if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 1 ]] && [[ $selection -le ${#disks[@]} ]]; then
