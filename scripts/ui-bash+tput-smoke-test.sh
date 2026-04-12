@@ -175,6 +175,42 @@ get_key() {
     esac
 }
 
+get_theme_key() {
+    local k rest read_status
+    IFS= read -rsn1 k
+    read_status=$?
+
+    if [[ $read_status -ne 0 ]]; then
+        echo "OTHER"
+        return 0
+    fi
+
+    if [[ -z "${k:-}" ]]; then
+        echo "ENTER"
+        return 0
+    fi
+
+    if [[ "$k" == $'\x1b' ]]; then
+        IFS= read -rsn2 rest || true
+        case "${rest:-}" in
+            "[A") echo "UP" ;;
+            "[B") echo "DOWN" ;;
+            "OM") echo "ENTER" ;;
+            *) echo "ESC" ;;
+        esac
+        return 0
+    fi
+
+    case "$k" in
+        1) echo "THEME1" ;;
+        2) echo "THEME2" ;;
+        3) echo "THEME3" ;;
+        $'\n'|$'\r') echo "ENTER" ;;
+        q|Q) echo "QUIT" ;;
+        *) echo "OTHER" ;;
+    esac
+}
+
 draw_box_line() {
     local row="$1"
     local col="$2"
@@ -303,7 +339,7 @@ run_theme_selector() {
 
     while true; do
         draw_theme_ui "$selected_theme"
-        key="$(get_key)"
+        key="$(get_theme_key)"
 
         case "$key" in
             UP)
@@ -311,6 +347,21 @@ run_theme_selector() {
                 ;;
             DOWN)
                 (( selected_theme < ${#THEME_OPTIONS[@]} - 1 )) && selected_theme=$((selected_theme + 1))
+                ;;
+            THEME1)
+                selected_theme=0
+                apply_theme "white"
+                return 0
+                ;;
+            THEME2)
+                selected_theme=1
+                apply_theme "orange"
+                return 0
+                ;;
+            THEME3)
+                selected_theme=2
+                apply_theme "green"
+                return 0
                 ;;
             ENTER)
                 case "$selected_theme" in
