@@ -19,6 +19,7 @@ SWAP_REASON=""
 SUGGESTED_TIMEZONE=""
 SUGGESTED_LOCALE=""
 SUGGESTED_HOSTNAME="debian-pc"
+SUGGESTED_KEYBOARD="us"
 CREATE_BACKUP="S"
 SELECTED_EFI_SIZE=""
 SELECTED_EFI_GB=1
@@ -26,6 +27,9 @@ SELECTED_SYSTEM_SIZE=""
 SELECTED_SYSTEM_GB=0
 SELECTED_SWAP_SIZE=""
 SELECTED_CREATE_BACKUP="S"
+SELECTED_LOCALE=""
+SELECTED_TIMEZONE=""
+SELECTED_KEYBOARD=""
 EFFECTIVE_BACKUP_GB=0
 
 step() {
@@ -131,6 +135,12 @@ calculate_recommendations() {
     SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
     [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
 
+    if [[ "$SUGGESTED_LOCALE" == es_* ]]; then
+        SUGGESTED_KEYBOARD="es"
+    else
+        SUGGESTED_KEYBOARD="us"
+    fi
+
     SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$SUGGESTED_EFI}")"
     SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
     if (( SELECTED_EFI_GB < 1 )); then
@@ -156,6 +166,10 @@ calculate_recommendations() {
         SELECTED_CREATE_BACKUP="N"
     fi
 
+    SELECTED_LOCALE="${DRYRUN_LOCALE:-$SUGGESTED_LOCALE}"
+    SELECTED_TIMEZONE="${DRYRUN_TIMEZONE:-$SUGGESTED_TIMEZONE}"
+    SELECTED_KEYBOARD="${DRYRUN_KEYBOARD:-$SUGGESTED_KEYBOARD}"
+
     EFFECTIVE_BACKUP_GB=$((DISK_SIZE_GB - SELECTED_SYSTEM_GB - SELECTED_EFI_GB))
     if (( EFFECTIVE_BACKUP_GB <= 0 )); then
         EFFECTIVE_BACKUP_GB=0
@@ -173,6 +187,8 @@ print_defaults() {
     printf 'DRYRUN_DEFAULT_BACKUP=%sG\n' "$SUGGESTED_BACKUP_GB"
     printf 'DRYRUN_DEFAULT_CREATE_BACKUP=%s\n' "$CREATE_BACKUP"
     printf 'DRYRUN_DEFAULT_SWAP=%s\n' "$SUGGESTED_SWAP"
+    printf 'DRYRUN_DEFAULT_LOCALE=%s\n' "$SUGGESTED_LOCALE"
+    printf 'DRYRUN_DEFAULT_TIMEZONE=%s\n' "$SUGGESTED_TIMEZONE"
 }
 
 analyze_memory() {
@@ -320,10 +336,12 @@ analyze_and_suggest() {
     printf "[dry-run] Elegido  --> Hostname: %s\n" "$SUGGESTED_HOSTNAME"
 
     printf "[dry-run] Sugerido --> Timezone: %s\n" "$SUGGESTED_TIMEZONE"
-    printf "[dry-run] Elegido  --> Timezone: %s\n" "$SUGGESTED_TIMEZONE"
+    printf "[dry-run] Elegido  --> Timezone: %s\n" "$SELECTED_TIMEZONE"
 
     printf "[dry-run] Sugerido --> Locale: %s\n" "$SUGGESTED_LOCALE"
-    printf "[dry-run] Elegido  --> Locale: %s\n" "$SUGGESTED_LOCALE"
+    printf "[dry-run] Elegido  --> Locale: %s\n" "$SELECTED_LOCALE"
+    printf "[dry-run] Sugerido --> Teclado: %s\n" "$SUGGESTED_KEYBOARD"
+    printf "[dry-run] Elegido  --> Teclado: %s\n" "$SELECTED_KEYBOARD"
 
     ok "recomendaciones calculadas con la misma base de opcion 1"
 }

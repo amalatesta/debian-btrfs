@@ -12,7 +12,8 @@ set -euo pipefail
 # - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
 # - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - OK
 # - 0008.0006 - Simulacion interactiva inicial con sugerencia de EFI - OK
-# - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - Pendiente validacion
+# - 0008.0007 - Sumar mas preguntas guiadas fuera de UI con pantalla limpia - OK
+# - 0008.0008 - Preguntas iniciales tipo Debian (locale/teclado/timezone) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -52,6 +53,9 @@ DRYRUN_SELECTED_EFI="1G"
 DRYRUN_SELECTED_SYSTEM=""
 DRYRUN_SELECTED_BACKUP="S"
 DRYRUN_SELECTED_SWAP=""
+DRYRUN_SELECTED_LOCALE=""
+DRYRUN_SELECTED_KEYBOARD=""
+DRYRUN_SELECTED_TIMEZONE=""
 
 C_RESET=""
 C_BORDER=""
@@ -475,6 +479,9 @@ run_with_report() {
 
 ask_efi_in_plain_terminal() {
     local option2_path="$1"
+    local locale_value=""
+    local keyboard_value=""
+    local timezone_value=""
     local efi_size=""
     local system_size=""
     local create_backup=""
@@ -484,6 +491,9 @@ ask_efi_in_plain_terminal() {
     local default_system="64G"
     local default_backup="S"
     local default_swap="8G"
+    local default_locale="en_US.UTF-8"
+    local default_timezone="UTC"
+    local default_keyboard="us"
 
     restore_terminal
     clear > /dev/tty
@@ -495,9 +505,39 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_SYSTEM) default_system="$value" ;;
             DRYRUN_DEFAULT_CREATE_BACKUP) default_backup="$value" ;;
             DRYRUN_DEFAULT_SWAP) default_swap="$value" ;;
+            DRYRUN_DEFAULT_LOCALE) default_locale="$value" ;;
+            DRYRUN_DEFAULT_TIMEZONE) default_timezone="$value" ;;
         esac
     done <<< "$defaults_output"
 
+    if [[ "$default_locale" == es_* ]]; then
+        default_keyboard="es"
+    fi
+
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+
+    read -r -p "Locale [${default_locale}] : " locale_value < /dev/tty
+    locale_value="${locale_value:-$default_locale}"
+    DRYRUN_SELECTED_LOCALE="$locale_value"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+
+    read -r -p "Teclado [${default_keyboard}] : " keyboard_value < /dev/tty
+    keyboard_value="${keyboard_value:-$default_keyboard}"
+    DRYRUN_SELECTED_KEYBOARD="$keyboard_value"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+
+    read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
+    timezone_value="${timezone_value:-$default_timezone}"
+    DRYRUN_SELECTED_TIMEZONE="$timezone_value"
+
+    clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
 
@@ -539,6 +579,9 @@ ask_efi_in_plain_terminal() {
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] Locale elegido: %s\n" "$locale_value" > /dev/tty
+    printf "[dry-run] Teclado elegido: %s\n" "$keyboard_value" > /dev/tty
+    printf "[dry-run] Timezone elegido: %s\n" "$timezone_value" > /dev/tty
     printf "[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
     printf "[dry-run] Sistema elegido: %s\n" "$system_size" > /dev/tty
     printf "[dry-run] Swap elegido: %s\n" "$swap_size" > /dev/tty
@@ -585,10 +628,13 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_SWAP_SIZE=\"$DRYRUN_SELECTED_SWAP\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_LOCALE=\"$DRYRUN_SELECTED_LOCALE\" DRYRUN_KEYBOARD=\"$DRYRUN_SELECTED_KEYBOARD\" DRYRUN_TIMEZONE=\"$DRYRUN_SELECTED_TIMEZONE\" DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_SWAP_SIZE=\"$DRYRUN_SELECTED_SWAP\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
+            "Locale elegido para la simulacion: $DRYRUN_SELECTED_LOCALE"
+            "Teclado elegido para la simulacion: $DRYRUN_SELECTED_KEYBOARD"
+            "Timezone elegida para la simulacion: $DRYRUN_SELECTED_TIMEZONE"
             "EFI elegido para la simulacion: $DRYRUN_SELECTED_EFI"
             "Sistema elegido para la simulacion: $DRYRUN_SELECTED_SYSTEM"
             "Swap elegido para la simulacion: $DRYRUN_SELECTED_SWAP"
