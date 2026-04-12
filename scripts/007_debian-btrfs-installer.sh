@@ -523,11 +523,9 @@ setup_ui() {
             fi
             ;;
         AUTO|*)
-            if command -v whiptail &>/dev/null && [[ -t 0 ]] && [[ -t 1 ]]; then
-                USE_WHIPTAIL="S"
-            else
-                USE_WHIPTAIL="N"
-            fi
+            # Modo estable por defecto: texto.
+            # Whiptail queda disponible bajo pedido explicito con --whiptail.
+            USE_WHIPTAIL="N"
             ;;
     esac
 
