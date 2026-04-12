@@ -7,7 +7,7 @@ set -euo pipefail
 #
 # Historial de mejoras
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
-# - 0008.0002 - Nueva iteracion
+# - 0008.0002 - Opcion 3 Ayuda funcional
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -64,6 +64,32 @@ restore_terminal() {
 cleanup() {
     restore_terminal
     clear
+}
+
+show_help_screen() {
+    restore_terminal
+    clear
+    cat << 'EOF'
+============================================
+DEBIAN BTRFS INSTALLER v008 - AYUDA
+============================================
+
+Este es un prototipo de interfaz en bash+tput.
+
+Navegacion del menu principal:
+- Flechas arriba/abajo: mover opcion
+- TAB / Flechas izquierda-derecha: mover foco a botones
+- ENTER: confirmar seleccion
+- q: salir
+
+Flujo actual:
+- Opcion 3 (Ayuda): muestra esta pantalla y vuelve al menu.
+- Opcion 4 (Salir): finaliza el script al confirmar.
+- Opciones 1 y 2: placeholder (sin accion real por ahora).
+
+EOF
+    read -r -p "Presiona ENTER para volver al menu... " _
+    setup_terminal
 }
 
 init_palette() {
@@ -426,10 +452,18 @@ main() {
             break
         fi
 
-        if (( MENU_SELECTED == 3 )); then
-            result="Salir"
-            break
-        fi
+        case "$MENU_SELECTED" in
+            2)
+                show_help_screen
+                ;;
+            3)
+                result="Salir"
+                break
+                ;;
+            *)
+                # Opciones 1 y 2 quedan como placeholders por ahora.
+                ;;
+        esac
     done
 
     cleanup
