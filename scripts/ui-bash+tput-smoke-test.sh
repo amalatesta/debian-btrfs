@@ -149,7 +149,8 @@ get_key() {
     fi
 
     if [[ -z "${k:-}" ]]; then
-        echo "ENTER"
+        # Lectura vacia espuria: no tratar como ENTER para evitar acciones fantasmas.
+        echo "OTHER"
         return 0
     fi
 
