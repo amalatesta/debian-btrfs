@@ -281,19 +281,27 @@ analyze_and_suggest() {
     printf "[dry-run] disco objetivo sugerido: %s\n" "$DISK"
     printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DISK_SIZE_GB"
     printf "[dry-run] RAM usada para calculo: %sGB\n" "$RAM_GB"
-    printf "[dry-run] EFI recomendado: %s\n" "$SUGGESTED_EFI"
-    printf "[dry-run] EFI elegido en simulacion: %s\n" "$SELECTED_EFI_SIZE"
-    printf "[dry-run] Sistema recomendado: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
-    printf "[dry-run] Sistema elegido en simulacion: %s\n" "$SELECTED_SYSTEM_SIZE"
-    if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run] Backup resultante con elecciones: %sG\n" "$EFFECTIVE_BACKUP_GB"
+    printf "[dry-run] --- sugerido por analisis ---\n"
+    printf "[dry-run] EFI sugerido: %s\n" "$SUGGESTED_EFI"
+    printf "[dry-run] Sistema sugerido: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
+    if [[ "$CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Backup sugerido: %sG\n" "$SUGGESTED_BACKUP_GB"
     else
-        printf "[dry-run] Backup resultante: no crear (sin espacio suficiente)\n"
+        printf "[dry-run] Backup sugerido: no crear (sin espacio suficiente)\n"
     fi
-    printf "[dry-run] Swapfile recomendado: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
+    printf "[dry-run] Swapfile sugerido: %s (%s)\n" "$SUGGESTED_SWAP" "$SWAP_REASON"
     printf "[dry-run] Hostname sugerido: %s\n" "$SUGGESTED_HOSTNAME"
     printf "[dry-run] Timezone sugerido: %s\n" "$SUGGESTED_TIMEZONE"
     printf "[dry-run] Locale sugerido: %s\n" "$SUGGESTED_LOCALE"
+    printf "[dry-run] --- configuracion final elegida ---\n"
+    printf "[dry-run] EFI final: %s\n" "$SELECTED_EFI_SIZE"
+    printf "[dry-run] Sistema final: %s\n" "$SELECTED_SYSTEM_SIZE"
+    if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Backup final: %sG\n" "$EFFECTIVE_BACKUP_GB"
+    else
+        printf "[dry-run] Backup final: no crear\n"
+    fi
+    printf "[dry-run] Swapfile final: %s\n" "$SUGGESTED_SWAP"
     ok "recomendaciones calculadas con la misma base de opcion 1"
 }
 
@@ -442,8 +450,16 @@ print_preview_plan() {
 EOF
 
     printf "\n[dry-run] simulacion de resultado esperado (informativo):\n"
-    printf "[dry-run]   supuesto: en opcion 1 aceptas ENTER sobre las sugerencias.\n"
     printf "[dry-run]   disco elegido por defecto: %s\n" "$DISK"
+    printf "[dry-run]   --- sugerido ---\n"
+    printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
+    printf "[dry-run]   particion 2: SISTEMA   %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
+    if [[ "$CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
+    else
+        printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
+    fi
+    printf "[dry-run]   --- final (segun respuestas) ---\n"
     printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
     printf "[dry-run]   particion 2: SISTEMA   %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
     if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
