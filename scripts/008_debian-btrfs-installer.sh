@@ -72,6 +72,8 @@ DRYRUN_SELECTED_ENABLE_POPCON="N"
 DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE="POSTBOOT"
 DRYRUN_SELECTED_INSTALL_SSH_IN_BASE="S"
 DRYRUN_SELECTED_INSTALL_TASKSEL_NOW="N"
+DRYRUN_SELECTED_DISK=""
+DRYRUN_SELECTED_USER_PASSWORD=""
 
 C_RESET=""
 C_BORDER=""
@@ -1036,17 +1038,109 @@ ask_efi_in_plain_terminal() {
     return 0
 }
 
+ask_disk_password_in_plain_terminal() {
+    restore_terminal
+    flush_input_buffer
+    clear
+
+    printf "\n[install] === SELECCION DE DISCO ===\n\n" > /dev/tty
+
+    local disks=()
+    local disk_info=()
+    local live_root_src live_root_disk
+    live_root_src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+    live_root_disk="$(lsblk -ndo PKNAME "$live_root_src" 2>/dev/null || true)"
+
+    while IFS= read -r line; do
+        local dname dsize dmodel dtype
+        dname="$line"
+        dsize="$(lsblk -ndo SIZE "/dev/$dname" 2>/dev/null | xargs)"
+        dmodel="$(lsblk -ndo MODEL "/dev/$dname" 2>/dev/null | xargs)"
+        dtype="$(lsblk -ndo TYPE "/dev/$dname" 2>/dev/null)"
+        if [[ "$dtype" == "disk" ]]; then
+            disks+=("/dev/$dname")
+            disk_info+=("$dsize $dmodel")
+        fi
+    done < <(lsblk -ndpo NAME | sed 's|/dev/||')
+
+    if [[ ${#disks[@]} -eq 0 ]]; then
+        printf "[install][error] No se detectaron discos.\n" > /dev/tty
+        setup_terminal
+        return 1
+    fi
+
+    for i in "${!disks[@]}"; do
+        local idx=$((i + 1))
+        printf "  [%s] %s  (%s)\n" "$idx" "${disks[$i]}" "${disk_info[$i]}" > /dev/tty
+        if [[ -n "$live_root_disk" ]] && [[ "${disks[$i]}" == "/dev/$live_root_disk" ]]; then
+            printf "       Aviso: puede ser el disco live actual\n" > /dev/tty
+        fi
+        if lsblk -n "${disks[$i]}" 2>/dev/null | grep -q part; then
+            printf "       Aviso: contiene particiones (seran eliminadas)\n" > /dev/tty
+        fi
+    done
+    printf "\n" > /dev/tty
+
+    local selection candidate
+    while true; do
+        read -r -p "[install] Selecciona disco [1-${#disks[@]}]: " selection < /dev/tty
+        selection="${selection:-1}"
+        if [[ "$selection" =~ ^[0-9]+$ ]] && (( selection >= 1 )) && (( selection <= ${#disks[@]} )); then
+            candidate="${disks[$((selection - 1))]}"
+            if lsblk -n "$candidate" 2>/dev/null | grep -q part; then
+                printf "\n[install][warn] El disco %s contiene particiones. SERAN ELIMINADAS.\n" "$candidate" > /dev/tty
+                local wipe_confirm
+                read -r -p "[install] Continuar? (S/N) [N]: " wipe_confirm < /dev/tty
+                wipe_confirm="${wipe_confirm:-N}"
+                wipe_confirm="${wipe_confirm^^}"
+                if [[ "$wipe_confirm" != "S" ]]; then
+                    printf "[install] Elige otro disco.\n\n" > /dev/tty
+                    continue
+                fi
+            fi
+            DRYRUN_SELECTED_DISK="$candidate"
+            break
+        fi
+        printf "[install] Seleccion invalida.\n" > /dev/tty
+    done
+
+    printf "\n[install] === PASSWORD DE USUARIO ===\n" > /dev/tty
+    printf "[install] Usuario : %s\n\n" "$DRYRUN_SELECTED_USERNAME" > /dev/tty
+
+    local pw1 pw2
+    while true; do
+        read -r -s -p "[install] Password        : " pw1 < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ -z "$pw1" ]]; then
+            printf "[install][warn] La password no puede estar vacia.\n" > /dev/tty
+            continue
+        fi
+        read -r -s -p "[install] Repite password : " pw2 < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ "$pw1" == "$pw2" ]]; then
+            DRYRUN_SELECTED_USER_PASSWORD="$pw1"
+            break
+        fi
+        printf "[install][warn] Las passwords no coinciden. Intenta de nuevo.\n" > /dev/tty
+    done
+
+    printf "\n[install] Disco: %s  |  Password: definida\n" "$DRYRUN_SELECTED_DISK" > /dev/tty
+    sleep 0.5
+    setup_terminal
+    flush_input_buffer
+    return 0
+}
+
 run_install_part1() {
     local option1_path="${SCRIPT_DIR}/${OPTION1_SCRIPT}"
     local precheck_lines=(
         "Instalacion real de Debian"
         ""
-        "Se ejecutara el instalador:"
-        "  ${OPTION1_SCRIPT}"
+        "Se seguira el mismo flujo de preguntas que el dry-run"
+        "y se pedira tambien el disco y la password de usuario."
         ""
-        "Las preguntas de disco y password se hacen"
-        "dentro del instalador, en terminal limpia."
-        "Al finalizar el sistema se reiniciara."
+        "Al finalizar se mostrara un resumen y podras"
+        "confirmar si ejecutar la instalacion real o salir."
         ""
         "ADVERTENCIA: se borrara el disco seleccionado."
     )
@@ -1064,17 +1158,49 @@ run_install_part1() {
         return 1
     fi
 
-    if ! confirm_yes_no "CONFIRMAR INSTALACION" "Iniciar la instalacion ahora?" 0; then
+    if ! confirm_yes_no "CONFIRMAR" "Iniciar el flujo de preguntas?" 0; then
         return 0
     fi
 
+    # Recolectar decisiones comunes (mismo flujo que dry-run)
     if ! ask_efi_in_plain_terminal "$option1_path"; then
         return 0
     fi
 
-    # La instalacion cede el control total a install.sh en terminal limpia.
-    # No usamos run_with_report porque el instalador es interactivo (disco,
-    # password, progreso largo) y necesita stdout/stdin directos.
+    # Recolectar disco y password (especificos de install)
+    if ! ask_disk_password_in_plain_terminal; then
+        return 0
+    fi
+
+    # Mostrar resumen en UI antes de la confirmacion final
+    local summary_lines=(
+        "Disco objetivo : $DRYRUN_SELECTED_DISK"
+        ""
+        "Locale   : $DRYRUN_SELECTED_LOCALE"
+        "Teclado  : $DRYRUN_SELECTED_KEYBOARD"
+        "Timezone : $DRYRUN_SELECTED_TIMEZONE"
+        "Hostname : $DRYRUN_SELECTED_HOSTNAME"
+        "Usuario  : $DRYRUN_SELECTED_USERNAME"
+        "Password : definida"
+        ""
+        "EFI      : $DRYRUN_SELECTED_EFI"
+        "Sistema  : $DRYRUN_SELECTED_SYSTEM"
+        "Swap     : $DRYRUN_SELECTED_SWAP"
+        "Backup   : $DRYRUN_SELECTED_BACKUP"
+        ""
+        "Modo sw  : $DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE"
+        "SSH base : $DRYRUN_SELECTED_INSTALL_SSH_IN_BASE"
+        "non-free : $DRYRUN_SELECTED_APT_ENABLE_NONFREE"
+        ""
+        "ADVERTENCIA: EL DISCO $DRYRUN_SELECTED_DISK SERA BORRADO."
+    )
+    show_info_box "RESUMEN INSTALACION" summary_lines "ENTER/Esc/q: revisar" "normal"
+
+    if ! confirm_yes_no "EJECUTAR INSTALACION" "Ejecutar la instalacion real ahora con estos parametros?" 0; then
+        return 0
+    fi
+
+    # Ceder control a install.sh en terminal limpia con todos los parametros
     restore_terminal
     clear
     DRYRUN_LOCALE="$DRYRUN_SELECTED_LOCALE" \
@@ -1082,6 +1208,8 @@ run_install_part1() {
     DRYRUN_TIMEZONE="$DRYRUN_SELECTED_TIMEZONE" \
     DRYRUN_HOSTNAME="$DRYRUN_SELECTED_HOSTNAME" \
     DRYRUN_USERNAME="$DRYRUN_SELECTED_USERNAME" \
+    DRYRUN_DISK="$DRYRUN_SELECTED_DISK" \
+    INSTALL_USER_PASSWORD="$DRYRUN_SELECTED_USER_PASSWORD" \
     DRYRUN_APT_ENABLE_NONFREE="$DRYRUN_SELECTED_APT_ENABLE_NONFREE" \
     DRYRUN_APT_ENABLE_SECURITY="$DRYRUN_SELECTED_APT_ENABLE_SECURITY" \
     DRYRUN_APT_ENABLE_UPDATES="$DRYRUN_SELECTED_APT_ENABLE_UPDATES" \
@@ -1097,7 +1225,7 @@ run_install_part1() {
     DRYRUN_SWAP_SIZE="$DRYRUN_SELECTED_SWAP" \
     DRYRUN_CREATE_BACKUP="$DRYRUN_SELECTED_BACKUP" \
     bash "$option1_path"
-    # Si install.sh termina sin reboot (cancelacion), volvemos a la UI
+    # Si install.sh termina sin reboot (cancelacion o error), volvemos a la UI
     setup_terminal
 }
 

@@ -925,12 +925,29 @@ main() {
     INSTALL_SSH_IN_BASE="${DRYRUN_INSTALL_SSH_IN_BASE:-S}"; INSTALL_SSH_IN_BASE="${INSTALL_SSH_IN_BASE^^}"
     INSTALL_TASKSEL_NOW="${DRYRUN_INSTALL_TASKSEL_NOW:-N}"; INSTALL_TASKSEL_NOW="${INSTALL_TASKSEL_NOW^^}"
 
-    # Pasos interactivos que no se pueden delegar a 008
+    # Pasos interactivos (se saltan si ya vinieron de 008 via env vars)
     check_requirements
-    select_disk
+
+    if [[ -n "${DRYRUN_DISK:-}" ]]; then
+        DISK="$DRYRUN_DISK"
+        printf "[install] disco recibido de UI: %s\n" "$DISK"
+    else
+        select_disk
+    fi
+
     calculate_suggestions
-    ask_password
-    print_install_summary
+
+    if [[ -n "${INSTALL_USER_PASSWORD:-}" ]]; then
+        USER_PASSWORD="$INSTALL_USER_PASSWORD"
+        printf "[install] password recibida de UI\n"
+    else
+        ask_password
+    fi
+
+    # Solo mostrar resumen interactivo si no se uso el flujo UI de 008
+    if [[ -z "${DRYRUN_DISK:-}" ]]; then
+        print_install_summary
+    fi
 
     # Pipeline de instalacion
     partition_disk
