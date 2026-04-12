@@ -366,6 +366,9 @@ handle_key() {
                 else
                     selected_option=$((${#OPTIONS[@]} - 1))
                 fi
+            else
+                # Cualquier tecla distinta de ENTER desarma confirmacion.
+                confirm_armed=0
             fi
             ;;
         DOWN)
@@ -375,16 +378,20 @@ handle_key() {
                 else
                     selected_option=0
                 fi
+            else
+                confirm_armed=0
             fi
             ;;
         LEFT)
             if [[ "$focus" == "buttons" ]]; then
                 selected_button=0
+                confirm_armed=0
             fi
             ;;
         RIGHT)
             if [[ "$focus" == "buttons" ]]; then
                 selected_button=1
+                confirm_armed=0
             fi
             ;;
         TAB)
@@ -409,6 +416,9 @@ handle_key() {
             exit_requested=1
             ;;
         OTHER)
+            if [[ "$focus" == "buttons" ]]; then
+                confirm_armed=0
+            fi
             ;;
     esac
 }
