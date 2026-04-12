@@ -8,7 +8,7 @@ set -euo pipefail
 # Historial de mejoras
 # - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
 # - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
-# - 0008.0003 - Opcion 2 primera parte (precheck dry-run) - Pendiente validacion
+# - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -19,6 +19,8 @@ MAIN_OPTIONS=(
     "Ayuda"
     "Salir"
 )
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OPTION2_SCRIPT="dry_run.sh"
 
 THEME_TITLE="Seleccion de Color"
 THEME_PROMPT="Elige una paleta para continuar:"
@@ -383,21 +385,22 @@ run_with_progress() {
 }
 
 run_dryrun_part1() {
+    local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
         "Modo prueba - primera parte"
         ""
-        "Se va a validar el script base de dry-run:"
-        "  scripts/006_debian-btrfs-installer.sh"
+        "Se va a ejecutar el script dedicado de la opcion 2:"
+        "  ${OPTION2_SCRIPT}"
         ""
         "Esta prueba NO toca disco."
     )
 
     show_info_box "DRY-RUN | PARTE 1" precheck_lines "ENTER/Esc/q: continuar" "normal"
 
-    if [[ ! -f "scripts/006_debian-btrfs-installer.sh" ]]; then
+    if [[ ! -f "$option2_path" ]]; then
         local missing_lines=(
             "No se encontro el archivo requerido:"
-            "scripts/006_debian-btrfs-installer.sh"
+            "$OPTION2_SCRIPT"
             ""
             "Verifica el repo y vuelve a intentar."
         )
@@ -405,16 +408,16 @@ run_dryrun_part1() {
         return 1
     fi
 
-    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar precheck de dry-run ahora?" 0; then
+    if ! confirm_yes_no "CONFIRMAR PRUEBA" "Ejecutar opcion 2 (primera parte) ahora?" 0; then
         return 0
     fi
 
-    if run_with_progress "DRY-RUN | PRECHECK" "bash -n scripts/006_debian-btrfs-installer.sh" "Precheck OK: sintaxis valida en 006." "Precheck fallo: revisar sintaxis en 006."; then
+    if run_with_progress "DRY-RUN | PARTE 1" "bash \"$option2_path\"" "Opcion 2 parte 1 completada." "Opcion 2 parte 1 fallo."; then
         local ok_lines=(
             "Primera parte completada."
             ""
-            "Siguiente paso: integrar ejecucion controlada"
-            "del dry-run desde este menu."
+            "Siguiente paso: ampliar el script de opcion 2"
+            "con flujo dry-run completo."
         )
         show_success_box ok_lines
     fi
