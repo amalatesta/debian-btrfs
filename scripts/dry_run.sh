@@ -245,6 +245,24 @@ print_preview_plan() {
 EOF
 
     cat <<'EOF'
+
+[dry-run] simulacion de resultado esperado (informativo):
+[dry-run]   supuesto: disco dedicado para Debian, esquema limpio.
+[dry-run]   particion 1: EFI       512MiB   FAT32   /boot/efi
+[dry-run]   particion 2: ROOT      resto    BTRFS   /
+[dry-run]
+[dry-run]   subvolumenes propuestos dentro de BTRFS:
+[dry-run]     - @           -> raiz del sistema
+[dry-run]     - @home       -> datos de usuario
+[dry-run]     - @snapshots  -> base sugerida para snapshots
+[dry-run]
+[dry-run]   montaje esperado:
+[dry-run]     - /           -> subvol=@
+[dry-run]     - /home       -> subvol=@home
+[dry-run]     - /.snapshots -> subvol=@snapshots
+EOF
+
+    cat <<'EOF'
 [dry-run] comandos de referencia (no ejecutados):
 [dry-run]   - lsblk -f
 [dry-run]   - blkid

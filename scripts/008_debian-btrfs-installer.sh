@@ -10,7 +10,7 @@ set -euo pipefail
 # - 0008.0002 - Ayuda integrada + refactor UI generica (confirm, preview, run_with_progress) - OK
 # - 0008.0003 - Opcion 2 externalizada en script propio (primera parte) - OK
 # - 0008.0004 - Ampliar opcion 2 con flujo dry-run controlado - OK
-# - 0008.0005 - Mostrar plan detallado del dry-run antes de ejecutar - Pendiente validacion
+# - 0008.0005 - Mostrar informe completo del dry-run en UI con scroll - Pendiente validacion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
@@ -386,6 +386,46 @@ run_with_progress() {
     return "$rc"
 }
 
+run_with_report() {
+    local title="$1"
+    local command="$2"
+    local success_note="${3:-Comando finalizado correctamente.}"
+    local error_note="${4:-El comando termino con error.}"
+    local log_file rc
+
+    log_file="$(mktemp)"
+
+    (bash -lc "$command" >"$log_file" 2>&1)
+    rc=$?
+
+    mapfile -t REPORT_LINES < "$log_file"
+    if (( ${#REPORT_LINES[@]} == 0 )); then
+        REPORT_LINES=("Sin salida generada por el comando.")
+    fi
+
+    show_info_box "$title" REPORT_LINES "Up/Down/PgUp/PgDn: scroll | ENTER/Esc/q: cerrar" "wide-log"
+
+    local RESULT_LINES=(
+        "Comando ejecutado:"
+        ""
+        "$command"
+        ""
+        "Codigo de salida: $rc"
+    )
+
+    if [[ "$rc" -eq 0 ]]; then
+        RESULT_LINES+=("" "$success_note")
+        show_success_box RESULT_LINES
+    else
+        RESULT_LINES+=("" "$error_note")
+        show_error_box RESULT_LINES
+    fi
+
+    rm -f "$log_file"
+
+    return "$rc"
+}
+
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
     local precheck_lines=(
@@ -394,7 +434,8 @@ run_dryrun_part1() {
         "Se ejecutara un script externo de diagnostico:"
         "  ${OPTION2_SCRIPT}"
         ""
-        "El detalle de pasos e informe se gestiona en ese script."
+        "Se mostrara el informe completo dentro de esta UI."
+        "Usar scroll para recorrer el relevamiento y la simulacion."
     )
 
     show_info_box "DRY-RUN" precheck_lines "ENTER/Esc/q: continuar" "normal"
@@ -414,11 +455,12 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if run_with_progress "DRY-RUN" "bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
-            "Revisa el resumen mostrado y vuelve al menu."
+            "Se mostro el informe completo del dry-run."
+            "No se realizaron cambios en disco."
         )
         show_success_box ok_lines
     fi
