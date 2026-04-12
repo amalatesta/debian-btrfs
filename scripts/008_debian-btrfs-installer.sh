@@ -49,6 +49,8 @@ MENU_EVENT=""
 MENU_SELECTED=0
 result=""
 DRYRUN_SELECTED_EFI="1G"
+DRYRUN_SELECTED_SYSTEM=""
+DRYRUN_SELECTED_BACKUP="S"
 
 C_RESET=""
 C_BORDER=""
@@ -471,22 +473,60 @@ run_with_report() {
 }
 
 ask_efi_in_plain_terminal() {
+    local option2_path="$1"
     local efi_size=""
+    local system_size=""
+    local create_backup=""
+    local defaults_output key value
+    local default_efi="1G"
+    local default_system="64G"
+    local default_backup="S"
 
     restore_terminal
     clear > /dev/tty
 
+    defaults_output="$(bash "$option2_path" --defaults 2>/dev/null || true)"
+    while IFS='=' read -r key value; do
+        case "$key" in
+            DRYRUN_DEFAULT_EFI) default_efi="$value" ;;
+            DRYRUN_DEFAULT_SYSTEM) default_system="$value" ;;
+            DRYRUN_DEFAULT_CREATE_BACKUP) default_backup="$value" ;;
+        esac
+    done <<< "$defaults_output"
+
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
 
-    read -r -p "Tamano EFI para simulacion [1G]: " efi_size < /dev/tty
-    efi_size="${efi_size:-1G}"
+    read -r -p "Tamano EFI para simulacion [${default_efi}]: " efi_size < /dev/tty
+    efi_size="${efi_size:-$default_efi}"
     DRYRUN_SELECTED_EFI="$efi_size"
 
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-    printf "\n[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
+
+    read -r -p "Tamano SISTEMA para simulacion [${default_system}]: " system_size < /dev/tty
+    system_size="${system_size:-$default_system}"
+    DRYRUN_SELECTED_SYSTEM="$system_size"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+
+    read -r -p "Crear particion BACKUP? [${default_backup}]: " create_backup < /dev/tty
+    create_backup="${create_backup:-$default_backup}"
+    create_backup="${create_backup^^}"
+    if [[ "$create_backup" != "S" ]]; then
+        create_backup="N"
+    fi
+    DRYRUN_SELECTED_BACKUP="$create_backup"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+    printf "[dry-run] EFI elegido: %s\n" "$efi_size" > /dev/tty
+    printf "[dry-run] Sistema elegido: %s\n" "$system_size" > /dev/tty
+    printf "[dry-run] Crear backup: %s\n" "$create_backup" > /dev/tty
     printf "[dry-run] volviendo a la UI para mostrar el informe...\n" > /dev/tty
     sleep 0.6
 
@@ -525,15 +565,17 @@ run_dryrun_part1() {
         return 0
     fi
 
-    if ! ask_efi_in_plain_terminal; then
+    if ! ask_efi_in_plain_terminal "$option2_path"; then
         return 0
     fi
 
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
+    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$DRYRUN_SELECTED_EFI\" DRYRUN_SYSTEM_SIZE=\"$DRYRUN_SELECTED_SYSTEM\" DRYRUN_CREATE_BACKUP=\"$DRYRUN_SELECTED_BACKUP\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
         local ok_lines=(
             "Ejecucion completada."
             ""
             "EFI elegido para la simulacion: $DRYRUN_SELECTED_EFI"
+            "Sistema elegido para la simulacion: $DRYRUN_SELECTED_SYSTEM"
+            "Crear backup: $DRYRUN_SELECTED_BACKUP"
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
         )

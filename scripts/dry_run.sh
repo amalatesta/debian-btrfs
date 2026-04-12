@@ -22,6 +22,9 @@ SUGGESTED_HOSTNAME="debian-pc"
 CREATE_BACKUP="S"
 SELECTED_EFI_SIZE=""
 SELECTED_EFI_GB=1
+SELECTED_SYSTEM_SIZE=""
+SELECTED_SYSTEM_GB=0
+SELECTED_CREATE_BACKUP="S"
 EFFECTIVE_BACKUP_GB=0
 
 step() {
@@ -65,6 +68,97 @@ size_gib_to_int() {
     raw="$(normalize_size_gib "$raw")"
     raw="${raw%G}"
     printf '%s\n' "$raw"
+}
+
+calculate_recommendations() {
+    if [[ -z "$DISK" ]]; then
+        warn "no hay disco sugerido; no se pueden calcular recomendaciones"
+        return 1
+    fi
+
+    RAM_GB="$(free -m 2>/dev/null | awk '/^Mem:/{print int($2/1024)}')"
+    [[ -z "$RAM_GB" ]] && RAM_GB=0
+
+    if [[ $DISK_SIZE_GB -lt 128 ]]; then
+        SUGGESTED_SYSTEM_PCT=90
+    elif [[ $DISK_SIZE_GB -lt 256 ]]; then
+        SUGGESTED_SYSTEM_PCT=85
+    else
+        SUGGESTED_SYSTEM_PCT=80
+    fi
+
+    SUGGESTED_SYSTEM_GB=$((DISK_SIZE_GB * SUGGESTED_SYSTEM_PCT / 100))
+    SUGGESTED_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - 1))
+    if (( SUGGESTED_BACKUP_GB <= 0 )); then
+        SUGGESTED_BACKUP_GB=0
+        CREATE_BACKUP="N"
+    else
+        CREATE_BACKUP="S"
+    fi
+
+    if [[ $RAM_GB -le 2 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (sistema con poca memoria)"
+    elif [[ $RAM_GB -le 8 ]]; then
+        SUGGESTED_SWAP="$((RAM_GB * 2))G"
+        SWAP_REASON="2x RAM (permite hibernacion)"
+    elif [[ $RAM_GB -le 16 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (permite hibernacion)"
+    else
+        SUGGESTED_SWAP="8G"
+        SWAP_REASON="8GB fijo (RAM suficiente)"
+    fi
+
+    if grep -qiE 'laptop|notebook' /sys/class/dmi/id/product_name 2>/dev/null; then
+        SUGGESTED_HOSTNAME="debian-laptop"
+    else
+        SUGGESTED_HOSTNAME="debian-pc"
+    fi
+
+    SUGGESTED_TIMEZONE="$(cat /etc/timezone 2>/dev/null || true)"
+    [[ -z "$SUGGESTED_TIMEZONE" ]] && SUGGESTED_TIMEZONE="UTC"
+
+    SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
+    [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
+
+    SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$SUGGESTED_EFI}")"
+    SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
+    if (( SELECTED_EFI_GB < 1 )); then
+        SELECTED_EFI_SIZE="$SUGGESTED_EFI"
+        SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
+    fi
+
+    SELECTED_SYSTEM_SIZE="$(normalize_size_gib "${DRYRUN_SYSTEM_SIZE:-${SUGGESTED_SYSTEM_GB}G}")"
+    SELECTED_SYSTEM_GB="$(size_gib_to_int "$SELECTED_SYSTEM_SIZE")"
+    if (( SELECTED_SYSTEM_GB < 16 )); then
+        SELECTED_SYSTEM_SIZE="${SUGGESTED_SYSTEM_GB}G"
+        SELECTED_SYSTEM_GB="$SUGGESTED_SYSTEM_GB"
+    fi
+
+    SELECTED_CREATE_BACKUP="${DRYRUN_CREATE_BACKUP:-$CREATE_BACKUP}"
+    SELECTED_CREATE_BACKUP="${SELECTED_CREATE_BACKUP^^}"
+    if [[ "$SELECTED_CREATE_BACKUP" != "S" ]]; then
+        SELECTED_CREATE_BACKUP="N"
+    fi
+
+    EFFECTIVE_BACKUP_GB=$((DISK_SIZE_GB - SELECTED_SYSTEM_GB - SELECTED_EFI_GB))
+    if (( EFFECTIVE_BACKUP_GB <= 0 )); then
+        EFFECTIVE_BACKUP_GB=0
+        SELECTED_CREATE_BACKUP="N"
+    fi
+}
+
+print_defaults() {
+    detect_suggested_disk || return 1
+    calculate_recommendations || return 1
+
+    printf 'DRYRUN_DEFAULT_DISK=%s\n' "$DISK"
+    printf 'DRYRUN_DEFAULT_EFI=%s\n' "$SUGGESTED_EFI"
+    printf 'DRYRUN_DEFAULT_SYSTEM=%sG\n' "$SUGGESTED_SYSTEM_GB"
+    printf 'DRYRUN_DEFAULT_BACKUP=%sG\n' "$SUGGESTED_BACKUP_GB"
+    printf 'DRYRUN_DEFAULT_CREATE_BACKUP=%s\n' "$CREATE_BACKUP"
+    printf 'DRYRUN_DEFAULT_SWAP=%s\n' "$SUGGESTED_SWAP"
 }
 
 analyze_memory() {
@@ -182,72 +276,7 @@ detect_suggested_disk() {
 
 analyze_and_suggest() {
     step "7/8 - Calculo de sugerencias como opcion 1"
-
-    if [[ -z "$DISK" ]]; then
-        warn "no hay disco sugerido; no se pueden calcular recomendaciones"
-        return 1
-    fi
-
-    RAM_GB="$(free -m 2>/dev/null | awk '/^Mem:/{print int($2/1024)}')"
-    [[ -z "$RAM_GB" ]] && RAM_GB=0
-
-    if [[ $DISK_SIZE_GB -lt 128 ]]; then
-        SUGGESTED_SYSTEM_PCT=90
-    elif [[ $DISK_SIZE_GB -lt 256 ]]; then
-        SUGGESTED_SYSTEM_PCT=85
-    else
-        SUGGESTED_SYSTEM_PCT=80
-    fi
-
-    SUGGESTED_SYSTEM_GB=$((DISK_SIZE_GB * SUGGESTED_SYSTEM_PCT / 100))
-    SUGGESTED_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - 1))
-    if (( SUGGESTED_BACKUP_GB <= 0 )); then
-        SUGGESTED_BACKUP_GB=0
-        CREATE_BACKUP="N"
-    else
-        CREATE_BACKUP="S"
-    fi
-
-    if [[ $RAM_GB -le 2 ]]; then
-        SUGGESTED_SWAP="${RAM_GB}G"
-        SWAP_REASON="igual a RAM (sistema con poca memoria)"
-    elif [[ $RAM_GB -le 8 ]]; then
-        SUGGESTED_SWAP="$((RAM_GB * 2))G"
-        SWAP_REASON="2x RAM (permite hibernacion)"
-    elif [[ $RAM_GB -le 16 ]]; then
-        SUGGESTED_SWAP="${RAM_GB}G"
-        SWAP_REASON="igual a RAM (permite hibernacion)"
-    else
-        SUGGESTED_SWAP="8G"
-        SWAP_REASON="8GB fijo (RAM suficiente)"
-    fi
-
-    if grep -qiE 'laptop|notebook' /sys/class/dmi/id/product_name 2>/dev/null; then
-        SUGGESTED_HOSTNAME="debian-laptop"
-    else
-        SUGGESTED_HOSTNAME="debian-pc"
-    fi
-
-    SUGGESTED_TIMEZONE="$(cat /etc/timezone 2>/dev/null || true)"
-    [[ -z "$SUGGESTED_TIMEZONE" ]] && SUGGESTED_TIMEZONE="UTC"
-
-    SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
-    [[ -z "$SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
-
-    SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$SUGGESTED_EFI}")"
-    SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
-    if (( SELECTED_EFI_GB < 1 )); then
-        SELECTED_EFI_SIZE="$SUGGESTED_EFI"
-        SELECTED_EFI_GB="$(size_gib_to_int "$SELECTED_EFI_SIZE")"
-    fi
-
-    EFFECTIVE_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - SELECTED_EFI_GB))
-    if (( EFFECTIVE_BACKUP_GB <= 0 )); then
-        EFFECTIVE_BACKUP_GB=0
-        CREATE_BACKUP="N"
-    else
-        CREATE_BACKUP="S"
-    fi
+    calculate_recommendations || return 1
 
     printf "[dry-run] disco objetivo sugerido: %s\n" "$DISK"
     printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DISK_SIZE_GB"
@@ -255,8 +284,9 @@ analyze_and_suggest() {
     printf "[dry-run] EFI recomendado: %s\n" "$SUGGESTED_EFI"
     printf "[dry-run] EFI elegido en simulacion: %s\n" "$SELECTED_EFI_SIZE"
     printf "[dry-run] Sistema recomendado: %sG (%s%% del disco)\n" "$SUGGESTED_SYSTEM_GB" "$SUGGESTED_SYSTEM_PCT"
-    if [[ "$CREATE_BACKUP" == "S" ]]; then
-        printf "[dry-run] Backup resultante con EFI elegido: %sG\n" "$EFFECTIVE_BACKUP_GB"
+    printf "[dry-run] Sistema elegido en simulacion: %s\n" "$SELECTED_SYSTEM_SIZE"
+    if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Backup resultante con elecciones: %sG\n" "$EFFECTIVE_BACKUP_GB"
     else
         printf "[dry-run] Backup resultante: no crear (sin espacio suficiente)\n"
     fi
@@ -415,8 +445,8 @@ EOF
     printf "[dry-run]   supuesto: en opcion 1 aceptas ENTER sobre las sugerencias.\n"
     printf "[dry-run]   disco elegido por defecto: %s\n" "$DISK"
     printf "[dry-run]   particion 1: EFI       %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
-    printf "[dry-run]   particion 2: SISTEMA   %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
-    if [[ "$CREATE_BACKUP" == "S" ]]; then
+    printf "[dry-run]   particion 2: SISTEMA   %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
+    if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
         printf "[dry-run]   particion 3: BACKUP    %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
     else
         printf "[dry-run]   particion 3: BACKUP    omitida por espacio disponible\n"
@@ -471,6 +501,11 @@ main() {
     printf "[dry-run] RESULTADO: Analisis completado exitosamente\n"
     printf "[dry-run] ==========================================\n"
 }
+
+if [[ "${1:-}" == "--defaults" ]]; then
+    print_defaults
+    exit 0
+fi
 
 main
 exit 0
