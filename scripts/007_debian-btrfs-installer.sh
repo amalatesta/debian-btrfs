@@ -541,6 +541,12 @@ setup_ui() {
     fi
 }
 
+fallback_to_text_ui() {
+    UI_MODE="TEXT"
+    USE_WHIPTAIL="N"
+    warning "Se detecto comportamiento inestable de whiptail/TTY. Continuando en modo texto para evitar bucles."
+}
+
 ui_warn() {
     local msg="$1"
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
@@ -725,6 +731,7 @@ reset_runtime_state() {
 
 startup_wizard() {
     local action=""
+    local invalid_whiptail_reads=0
     WIZARD_ACTION=""
 
     while true; do
@@ -743,8 +750,16 @@ startup_wizard() {
         action="$(printf '%s' "$action" | grep -o '[1-4]' | head -n1 || true)"
 
         if [[ -z "$action" ]]; then
+            if [[ "$USE_WHIPTAIL" == "S" ]]; then
+                invalid_whiptail_reads=$((invalid_whiptail_reads + 1))
+                if [[ $invalid_whiptail_reads -ge 1 ]]; then
+                    fallback_to_text_ui
+                fi
+            fi
             continue
         fi
+
+        invalid_whiptail_reads=0
 
         case "$action" in
             1)
@@ -770,7 +785,11 @@ startup_wizard() {
                 return 0
                 ;;
             *)
-                ui_warn "Opcion invalida"
+                if [[ "$USE_WHIPTAIL" == "S" ]]; then
+                    fallback_to_text_ui
+                else
+                    ui_warn "Opcion invalida"
+                fi
                 ;;
         esac
     done
