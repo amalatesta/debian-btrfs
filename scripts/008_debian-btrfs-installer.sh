@@ -496,6 +496,7 @@ ask_efi_in_plain_terminal() {
     local default_keyboard="us"
     local default_keyboard_source="heuristica"
     local run_keyboard_selector=""
+    local quick_keyboard_choice=""
     local install_temp_tools=""
 
     restore_terminal
@@ -519,6 +520,8 @@ ask_efi_in_plain_terminal() {
         clear > /dev/tty
         printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
         printf "[dry-run] se puede abrir el selector real de teclado de Debian.\n\n" > /dev/tty
+        printf "[dry-run] Nota: si ese selector muestra opciones no deseadas, luego\n" > /dev/tty
+        printf "[dry-run] podras elegir rapido es/latam/us manualmente.\n\n" > /dev/tty
         read -r -p "Abrir selector de teclado ahora? [s/N]: " run_keyboard_selector < /dev/tty
         run_keyboard_selector="${run_keyboard_selector^^}"
 
@@ -545,6 +548,22 @@ ask_efi_in_plain_terminal() {
     if [[ -z "$default_keyboard" ]] && [[ "$default_locale" == es_* ]]; then
         default_keyboard="es"
     fi
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] selector rapido de teclado:\n" > /dev/tty
+    printf "[dry-run]   1) es\n" > /dev/tty
+    printf "[dry-run]   2) latam\n" > /dev/tty
+    printf "[dry-run]   3) us\n" > /dev/tty
+    printf "[dry-run]   4) mantener sugerido (%s)\n\n" "$default_keyboard" > /dev/tty
+    read -r -p "Opcion [4]: " quick_keyboard_choice < /dev/tty
+    quick_keyboard_choice="${quick_keyboard_choice:-4}"
+    case "$quick_keyboard_choice" in
+        1) default_keyboard="es" ;;
+        2) default_keyboard="latam" ;;
+        3) default_keyboard="us" ;;
+        *) : ;;
+    esac
 
     if [[ "$default_keyboard_source" != "system-file" ]]; then
         clear > /dev/tty
