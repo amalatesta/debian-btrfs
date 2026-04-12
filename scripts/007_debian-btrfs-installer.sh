@@ -993,10 +993,11 @@ normalize_size_gib() {
 
 debug_value_repr() {
     local value="${1-}"
-    local shell_escaped hex_bytes
+    local shell_escaped hex_bytes printable
     shell_escaped="$(printf '%q' "$value")"
     hex_bytes="$(printf '%s' "$value" | od -An -t x1 -v | tr -s ' ' | sed 's/^ //')"
-    echo "valor='$value' | escaped=$shell_escaped | hex=[${hex_bytes}]"
+    printable="$(printf '%s' "$value" | sed -n 'l' | tr -d '\n')"
+    echo "printable=${printable} | escaped=${shell_escaped} | hex=[${hex_bytes}]"
 }
 
 analyze_locale_timezone() {
