@@ -498,6 +498,7 @@ ask_efi_in_plain_terminal() {
     local run_keyboard_selector=""
     local quick_keyboard_choice=""
     local install_temp_tools=""
+    local inferred_locale_keyboard=""
 
     restore_terminal
     clear > /dev/tty
@@ -515,6 +516,27 @@ ask_efi_in_plain_terminal() {
             DRYRUN_DEFAULT_KEYBOARD_SOURCE) default_keyboard_source="$value" ;;
         esac
     done <<< "$defaults_output"
+
+    clear > /dev/tty
+    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
+    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
+
+    read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
+    timezone_value="${timezone_value:-$default_timezone}"
+    DRYRUN_SELECTED_TIMEZONE="$timezone_value"
+
+    case "$timezone_value" in
+        America/Argentina*|America/Montevideo|America/Santiago|America/Lima|America/Bogota|America/Mexico_City)
+            inferred_locale_keyboard="es_AR.UTF-8|latam"
+            ;;
+        Europe/Madrid)
+            inferred_locale_keyboard="es_ES.UTF-8|es"
+            ;;
+        *)
+            inferred_locale_keyboard="${default_locale}|${default_keyboard}"
+            ;;
+    esac
+    IFS='|' read -r default_locale default_keyboard <<< "$inferred_locale_keyboard"
 
     if command -v dpkg-reconfigure >/dev/null 2>&1; then
         clear > /dev/tty
@@ -605,14 +627,6 @@ ask_efi_in_plain_terminal() {
     read -r -p "Teclado [${default_keyboard}] : " keyboard_value < /dev/tty
     keyboard_value="${keyboard_value:-$default_keyboard}"
     DRYRUN_SELECTED_KEYBOARD="$keyboard_value"
-
-    clear > /dev/tty
-    printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
-    printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
-
-    read -r -p "Timezone [${default_timezone}] : " timezone_value < /dev/tty
-    timezone_value="${timezone_value:-$default_timezone}"
-    DRYRUN_SELECTED_TIMEZONE="$timezone_value"
 
     clear > /dev/tty
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
