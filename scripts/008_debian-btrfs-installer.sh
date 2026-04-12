@@ -517,9 +517,44 @@ run_with_report() {
     return "$rc"
 }
 
+run_dryrun_in_plain_terminal() {
+    local option2_path="$1"
+    local efi_size=""
+    local rc=0
+
+    restore_terminal
+    clear
+
+    printf "[dry-run] modo terminal (fuera del menu UI)\n"
+    printf "[dry-run] script: %s\n\n" "$option2_path"
+
+    read -r -p "Tamano EFI para simulacion [1G]: " efi_size
+    efi_size="${efi_size:-1G}"
+
+    printf "\n[dry-run] ejecutando analisis...\n\n"
+    if ! DRYRUN_EFI_SIZE="$efi_size" bash "$option2_path"; then
+        rc=$?
+    fi
+
+    printf "\n[dry-run] fin de ejecucion (codigo=%s)\n" "$rc"
+    read -r -p "Presiona ENTER para volver al menu..." _
+
+    setup_terminal
+    flush_input_buffer
+
+    local summary_lines=(
+        "Dry-run finalizado en modo terminal."
+        ""
+        "EFI usado en simulacion: $efi_size"
+        "Codigo de salida: $rc"
+    )
+    show_info_box "OK" summary_lines "ENTER/Esc/q: continuar" "normal"
+
+    return "$rc"
+}
+
 run_dryrun_part1() {
     local option2_path="${SCRIPT_DIR}/${OPTION2_SCRIPT}"
-    local efi_size
     local precheck_lines=(
         "Modo prueba (dry-run)"
         ""
@@ -527,8 +562,8 @@ run_dryrun_part1() {
         "  ${OPTION2_SCRIPT}"
         ""
         "Se hara una simulacion de la opcion 1 sin aplicar cambios."
-        "Primero se preguntara una configuracion sugerida y luego se mostrara"
-        "el informe final completo dentro de esta UI."
+        "Al confirmar SI, se abrira la terminal para ejecutar el analisis"
+        "y al finalizar volvera automaticamente al menu UI."
     )
 
     show_info_box "DRY-RUN" precheck_lines "ENTER/Esc/q: continuar" "normal"
@@ -548,22 +583,7 @@ run_dryrun_part1() {
         return 0
     fi
 
-    flush_input_buffer
-
-    if ! efi_size="$(choose_efi_size "1G")"; then
-        return 0
-    fi
-
-    if run_with_report "DRY-RUN | INFORME" "DRYRUN_EFI_SIZE=\"$efi_size\" bash \"$option2_path\"" "Opcion 2 completada." "Opcion 2 fallo."; then
-        local ok_lines=(
-            "Ejecucion completada."
-            ""
-            "EFI elegido para la simulacion: $efi_size"
-            "Se mostro el informe completo del dry-run."
-            "No se realizaron cambios en disco."
-        )
-        show_info_box "OK" ok_lines "ENTER/Esc/q: continuar" "normal"
-    fi
+    run_dryrun_in_plain_terminal "$option2_path"
 }
 
 init_palette() {
