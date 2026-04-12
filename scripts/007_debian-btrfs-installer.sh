@@ -450,6 +450,19 @@ ui_redraw_tty() {
     return 0
 }
 
+ui_after_dialog() {
+    if [[ "$USE_WHIPTAIL" != "S" ]]; then
+        return 0
+    fi
+
+    # Mensaje breve de transición para confirmar que se aceptó la acción
+    # y que el instalador pasa automáticamente al siguiente paso.
+    stty sane 2>/dev/null || true
+    whiptail --title "Procesando" --infobox "Cargando siguiente paso..." 8 50
+    sleep 0.15
+    return 0
+}
+
 ui_textbox_from_text() {
     local title="$1"
     local text="$2"
@@ -477,6 +490,7 @@ ui_textbox_from_text() {
         printf "%s\n" "$text" > "$tmpfile"
         whiptail --title "$title" --textbox "$tmpfile" "$win_h" "$win_w"
         rm -f "$tmpfile"
+        ui_after_dialog
         ui_redraw_tty
     else
         echo "$text"
@@ -491,6 +505,7 @@ ui_continue_or_back() {
         ui_redraw_tty
         whiptail --title "$title" --yes-button "Seguir" --no-button "Volver" --yesno "$message" 12 78
         local rc=$?
+        ui_after_dialog
         ui_redraw_tty
         return $rc
     fi
@@ -547,6 +562,7 @@ ask_input() {
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
         answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+        ui_after_dialog
         ui_redraw_tty
         echo "$answer"
     else
@@ -563,6 +579,7 @@ ask_password() {
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
         answer="$(whiptail --title "$title" --passwordbox "$prompt" 12 78 3>&1 1>&2 2>&3)" || return 1
+        ui_after_dialog
         ui_redraw_tty
         echo "$answer"
     else
@@ -593,6 +610,7 @@ ask_yes_no() {
                 result="N"
             fi
         fi
+        ui_after_dialog
         ui_redraw_tty
         echo "$result"
     else
@@ -634,6 +652,7 @@ ask_menu() {
         (( menu_h > option_count )) && menu_h=$option_count
 
         answer="$(whiptail --title "$title" --menu "$prompt" "$win_h" "$win_w" "$menu_h" --default-item "$default_value" "$@" 3>&1 1>&2 2>&3)" || return 1
+        ui_after_dialog
         ui_redraw_tty
         echo "$answer"
     else
