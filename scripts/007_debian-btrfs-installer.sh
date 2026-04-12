@@ -991,6 +991,14 @@ normalize_size_gib() {
     echo "$value"
 }
 
+debug_value_repr() {
+    local value="${1-}"
+    local shell_escaped hex_bytes
+    shell_escaped="$(printf '%q' "$value")"
+    hex_bytes="$(printf '%s' "$value" | od -An -t x1 -v | tr -s ' ' | sed 's/^ //')"
+    echo "valor='$value' | escaped=$shell_escaped | hex=[${hex_bytes}]"
+}
+
 analyze_locale_timezone() {
     SUGGESTED_TIMEZONE="$(cat /etc/timezone 2>/dev/null || true)"
     if [[ -z "$SUGGESTED_TIMEZONE" ]]; then
@@ -1545,12 +1553,14 @@ interactive_config() {
             echo "Partición EFI (bootloader):"
         fi
         while true; do
-            EFI_SIZE="$(ask_input "Particion EFI" "Tamaño de EFI (ej: 1G)" "$SUGGESTED_EFI")" || error "Configuracion cancelada"
+            local efi_raw=""
+            efi_raw="$(ask_input "Particion EFI" "Tamaño de EFI (ej: 1G)" "$SUGGESTED_EFI")" || error "Configuracion cancelada"
+            EFI_SIZE="$efi_raw"
             EFI_SIZE="$(normalize_size_gib "$EFI_SIZE")"
             if is_valid_size_gib "$EFI_SIZE"; then
                 break
             fi
-            ui_warn "Tamaño EFI invalido. Usa formato entero en GiB, por ejemplo: 1G"
+            ui_warn "Tamaño EFI invalido. Usa formato entero en GiB, por ejemplo: 1G.\n\nLeido raw: $(debug_value_repr "$efi_raw")\nNormalizado: $(debug_value_repr "$EFI_SIZE")"
         done
         
         if [[ "$USE_WHIPTAIL" != "S" ]]; then
@@ -1559,10 +1569,12 @@ interactive_config() {
             echo "  Sugerencia: ${SUGGESTED_SYSTEM_GB}GB (${SUGGESTED_SYSTEM_PCT}% del disco)"
         fi
         while true; do
-            SYSTEM_SIZE="$(ask_input "Particion Sistema" "Tamaño de sistema (ej: 80G)" "${SUGGESTED_SYSTEM_GB}G")" || error "Configuracion cancelada"
+            local system_raw=""
+            system_raw="$(ask_input "Particion Sistema" "Tamaño de sistema (ej: 80G)" "${SUGGESTED_SYSTEM_GB}G")" || error "Configuracion cancelada"
+            SYSTEM_SIZE="$system_raw"
             SYSTEM_SIZE="$(normalize_size_gib "$SYSTEM_SIZE")"
             if ! is_valid_size_gib "$SYSTEM_SIZE"; then
-                ui_warn "Tamaño de sistema invalido. Usa formato entero en GiB, por ejemplo: 80G"
+                ui_warn "Tamaño de sistema invalido. Usa formato entero en GiB, por ejemplo: 80G.\n\nLeido raw: $(debug_value_repr "$system_raw")\nNormalizado: $(debug_value_repr "$SYSTEM_SIZE")"
                 continue
             fi
 
@@ -1605,12 +1617,14 @@ interactive_config() {
             echo ""
         fi
         while true; do
-            SWAP_SIZE="$(ask_input "Swap" "Tamaño de swap (ej: 8G)" "$SUGGESTED_SWAP")" || error "Configuracion cancelada"
+            local swap_raw=""
+            swap_raw="$(ask_input "Swap" "Tamaño de swap (ej: 8G)" "$SUGGESTED_SWAP")" || error "Configuracion cancelada"
+            SWAP_SIZE="$swap_raw"
             SWAP_SIZE="$(normalize_size_gib "$SWAP_SIZE")"
             if is_valid_size_gib "$SWAP_SIZE"; then
                 break
             fi
-            ui_warn "Tamaño de swap invalido. Usa formato entero en GiB, por ejemplo: 8G"
+            ui_warn "Tamaño de swap invalido. Usa formato entero en GiB, por ejemplo: 8G.\n\nLeido raw: $(debug_value_repr "$swap_raw")\nNormalizado: $(debug_value_repr "$SWAP_SIZE")"
         done
         
         # SISTEMA
