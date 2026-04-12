@@ -6,7 +6,8 @@ set -euo pipefail
 # Fecha: 2026-04-12
 #
 # Historial de mejoras
-# - 0008.0001 - Base bash+tput (menu + motor integrado, pendiente de OK)
+# - 0008.0001 - Base bash+tput (menu + motor integrado) - OK
+# - 0008.0002 - Nueva iteracion
 # ============================================
 
 MAIN_TITLE="Debian Btrfs Installer v008"
