@@ -493,6 +493,56 @@ detect_storage() {
 }
 
 print_preview_plan() {
+        step "8/8 - Simulacion del plan de instalacion"
+
+        printf "\n[dry-run] === PLAN DE PARTICIONES ===\n\n"
+        printf "[dry-run] EFI:\n"
+        printf "[dry-run]   Sugerido --> %s   FAT32   /boot/efi\n" "$SUGGESTED_EFI"
+        printf "[dry-run]   Elegido  --> %s   FAT32   /boot/efi\n" "$SELECTED_EFI_SIZE"
+        printf "\n[dry-run] SISTEMA (BTRFS raiz):\n"
+        printf "[dry-run]   Sugerido --> %sG   BTRFS   /\n" "$SUGGESTED_SYSTEM_GB"
+        printf "[dry-run]   Elegido  --> %s   BTRFS   /\n" "$SELECTED_SYSTEM_SIZE"
+        printf "\n[dry-run] BACKUP (BTRFS opcional):\n"
+        if [[ "$CREATE_BACKUP" == "S" ]]; then
+            printf "[dry-run]   Sugerido --> %sG   BTRFS   (desmontada)\n" "$SUGGESTED_BACKUP_GB"
+        else
+            printf "[dry-run]   Sugerido --> omitida por espacio\n"
+        fi
+        if [[ "$SELECTED_CREATE_BACKUP" == "S" ]]; then
+            printf "[dry-run]   Elegido  --> %sG   BTRFS   (desmontada)\n" "$EFFECTIVE_BACKUP_GB"
+        else
+            printf "[dry-run]   Elegido  --> omitida\n"
+        fi
+
+        cat <<'EOF'
+
+    [dry-run] === SUBVOLUMENES BTRFS ===
+    [dry-run]   - @           -> raiz del sistema (/)
+    [dry-run]   - @home       -> datos de usuario (/home)
+    [dry-run]   - @snapshots  -> base para snapshots (/.snapshots)
+    [dry-run]   - @swap       -> contenedor del swapfile
+    EOF
+
+        printf "\n[dry-run] === SWAP ===\n"
+        printf "[dry-run]   Sugerido --> %s   (en subvol @swap)\n" "$DEFAULT_SWAP_SIZE"
+        printf "[dry-run]   Elegido  --> %s   (en subvol @swap)\n" "$SELECTED_SWAP_SIZE"
+
+        cat <<'EOF'
+
+    [dry-run] === PASO A PASO EN INSTALACION REAL ===
+    [dry-run]   1) Confirmar disco objetivo y schema GPT/UEFI
+    [dry-run]   2) Crear/validar particiones (EFI, SISTEMA, BACKUP)
+    [dry-run]   3) Crear subvolumenes estándar (@, @home, @snapshots, @swap)
+    [dry-run]   4) Montar con opciones de rendimiento y generar fstab
+    [dry-run]   5) Instalar sistema base + Grub + herramientas Btrfs
+    [dry-run]   6) Validar arranque y preparar snapshots iniciales
+
+    [dry-run] === COMANDOS DE REFERENCIA ===
+    [dry-run]   - lsblk -f                      (ver estructura)
+    [dry-run]   - blkid                         (verificar particiones)
+    [dry-run]   - btrfs subvolume list /        (ver subvolumenes)
+    [dry-run]   - mount | grep btrfs           (ver montajes activos)
+    EOF
     step "8/8 - Resultado simulado si aceptaras los recomendados"
 
     cat <<'EOF'
