@@ -562,6 +562,11 @@ ask_input() {
     if [[ "$USE_WHIPTAIL" == "S" ]]; then
         ui_redraw_tty
         answer="$(whiptail --title "$title" --inputbox "$prompt" 12 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+        answer="${answer//$'\r'/}"
+        answer="${answer//$'\n'/}"
+        answer="${answer#"${answer%%[![:space:]]*}"}"
+        answer="${answer%"${answer##*[![:space:]]}"}"
+        [[ -z "$answer" ]] && answer="$default_value"
         ui_after_dialog
         ui_redraw_tty
         echo "$answer"
