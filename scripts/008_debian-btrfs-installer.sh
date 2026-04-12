@@ -497,7 +497,9 @@ ask_efi_in_plain_terminal() {
     printf "[dry-run] modo terminal (fuera del menu UI)\n" > /dev/tty
     printf "[dry-run] configuracion previa de simulacion\n\n" > /dev/tty
 
-    read -r -p "Tamano EFI para simulacion [${default_efi}]: " efi_size < /dev/tty
+    printf "[dry-run] [valor] - Sugerido por defecto\n" > /dev/tty
+    printf "[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
+    read -r -p "Tamano EFI [${default_efi}] : " efi_size < /dev/tty
     efi_size="${efi_size:-$default_efi}"
     DRYRUN_SELECTED_EFI="$efi_size"
 
