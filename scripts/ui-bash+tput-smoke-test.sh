@@ -65,6 +65,7 @@ BUTTONS=("Aceptar" "Cancelar")
 selected_option=0
 selected_button=0
 focus="list"   # list | buttons
+confirm_armed=0
 result=""
 
 get_key() {
@@ -153,18 +154,20 @@ draw_ui() {
     printf "%s" "$C_RESET"
 
     local opt_row
+    local opt_label
     for i in "${!OPTIONS[@]}"; do
         opt_row=$((start_row + 5 + i))
         tput cup "$opt_row" $((start_col + 4))
+        opt_label="$((i + 1)). ${OPTIONS[$i]}"
 
         if [[ $i -eq $selected_option ]]; then
             # Opcion seleccionada con estilo terminal verde clasico (invertido).
             printf "%s" "$C_FOCUS"
-            printf " %-60s " "${OPTIONS[$i]}"
+            printf " %-60s " "$opt_label"
             printf "%s" "$C_RESET"
         else
             printf "%s" "$C_OPT_NORMAL"
-            printf " %-60s " "${OPTIONS[$i]}"
+            printf " %-60s " "$opt_label"
             printf "%s" "$C_RESET"
         fi
     done
@@ -230,8 +233,10 @@ while true; do
         TAB)
             if [[ "$focus" == "list" ]]; then
                 focus="buttons"
+                confirm_armed=1
             else
                 focus="list"
+                confirm_armed=0
             fi
             ;;
         ENTER)
@@ -239,8 +244,9 @@ while true; do
                 # Enter en lista no ejecuta: pasa el foco a Aceptar.
                 focus="buttons"
                 selected_button=0
+                confirm_armed=1
             else
-                if [[ $selected_button -eq 0 ]]; then
+                if [[ $selected_button -eq 0 && $confirm_armed -eq 1 ]]; then
                     if [[ $selected_option -eq 3 ]]; then
                         cleanup
                         printf "Resultado: Salir\n"
@@ -249,6 +255,7 @@ while true; do
                     # Para opciones 1-3, Aceptar no cierra este smoke test.
                     # Vuelve el foco a la lista para seguir navegando.
                     focus="list"
+                    confirm_armed=0
                 else
                     result="Cancelado"
                     break
