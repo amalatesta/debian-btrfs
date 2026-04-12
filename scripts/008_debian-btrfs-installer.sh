@@ -332,6 +332,13 @@ show_command_preview() {
     show_info_box "$title" PREVIEW_LINES "ENTER/Esc/q: volver al menu" "wide-log"
 }
 
+flush_input_buffer() {
+    local key
+    while IFS= read -rsn1 -t 0.01 key; do
+        :
+    done
+}
+
 choose_efi_size() {
     local suggested="$1"
     local EFI_SIM_OPTIONS=(
@@ -341,6 +348,8 @@ choose_efi_size() {
         "4G"
         "Cancelar"
     )
+
+    flush_input_buffer
 
     run_menu "SIMULACION | EFI" "Elige tamano de EFI para simulacion" EFI_SIM_OPTIONS 0 0 "Flechas: mover | ENTER: confirmar | Esc/q: cancelar" 1 0
 
@@ -476,7 +485,7 @@ run_with_report() {
         REPORT_LINES=("Sin salida generada por el comando.")
     fi
 
-    show_info_box "$title" REPORT_LINES "ENTER/Esc/q: cerrar" "wide-log"
+    show_info_box "$title" REPORT_LINES "Informe completo" "wide-log"
 
     local RESULT_LINES=(
         "Comando ejecutado:"
@@ -488,10 +497,10 @@ run_with_report() {
 
     if [[ "$rc" -eq 0 ]]; then
         RESULT_LINES+=("" "$success_note")
-        show_success_box RESULT_LINES
+        show_info_box "OK" RESULT_LINES "ENTER/Esc/q: continuar" "normal"
     else
         RESULT_LINES+=("" "$error_note")
-        show_error_box RESULT_LINES
+        show_info_box "ERROR" RESULT_LINES "ENTER/Esc/q: volver" "normal"
     fi
 
     rm -f "$log_file"
@@ -530,6 +539,8 @@ run_dryrun_part1() {
         return 0
     fi
 
+    flush_input_buffer
+
     if ! efi_size="$(choose_efi_size "1G")"; then
         return 0
     fi
@@ -542,7 +553,7 @@ run_dryrun_part1() {
             "Se mostro el informe completo del dry-run."
             "No se realizaron cambios en disco."
         )
-        show_success_box ok_lines
+        show_info_box "OK" ok_lines "ENTER/Esc/q: continuar" "normal"
     fi
 }
 
