@@ -149,8 +149,8 @@ get_key() {
     fi
 
     if [[ -z "${k:-}" ]]; then
-        # Lectura vacia espuria: no tratar como ENTER para evitar acciones fantasmas.
-        echo "OTHER"
+        # En varias TTY, ENTER llega como lectura vacia con status 0.
+        echo "ENTER"
         return 0
     fi
 
