@@ -19,6 +19,7 @@ Para que sirve:
 - Centraliza en un solo menu las herramientas administrativas de esta carpeta.
 - Muestra reportes con scroll y dispara acciones sobre backup, recovery y export a USB.
 - Permite abrir este README directamente desde la UI.
+- Incluye comparaciones entre snapshots locales, backups btrbk y copias en USB.
 
 Uso:
 - sudo scripts/utilitarios/admin-tools.sh
@@ -87,6 +88,25 @@ Uso:
   - sudo scripts/utilitarios/usb-golden-snapshot.sh --device /dev/sdX1 --snap-id 123
 - Limpiar export local luego de copiar al USB:
   - sudo scripts/utilitarios/usb-golden-snapshot.sh --device /dev/sdX1 --cleanup-local-export
+
+### 6) snapshot-compare.sh
+
+Para que sirve:
+- Compara snapshots locales de Snapper.
+- Compara snapshots de btrbk contra el estado actual montando y desmontando `/mnt/backup` cuando hace falta.
+- Compara snapshots o streams almacenados en USB contra el estado actual.
+
+Uso:
+- Snapper vs actual:
+  - sudo scripts/utilitarios/snapshot-compare.sh --mode snapper --from 123
+- Snapper entre dos snapshots:
+  - sudo scripts/utilitarios/snapshot-compare.sh --mode snapper --from 123 --to 145 --show-diff
+- btrbk vs actual:
+  - sudo scripts/utilitarios/snapshot-compare.sh --mode btrbk --backup-snapshot @.20260413T0203
+- USB Btrfs vs actual:
+  - sudo scripts/utilitarios/snapshot-compare.sh --mode usb-btrfs --device /dev/sdX1 --usb-snapshot golden-20260413-0210
+- USB stream vs actual:
+  - sudo scripts/utilitarios/snapshot-compare.sh --mode usb-stream --device /dev/sdX1 --stream-name golden-20260413-0210.btrfs-stream
 
 ## Recomendaciones operativas
 
