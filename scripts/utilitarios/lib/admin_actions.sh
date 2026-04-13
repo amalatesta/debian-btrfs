@@ -125,6 +125,62 @@ admin_run_btrbk_now() {
    admin_run_report "Btrbk - Realizar snapshot ahora" "$BTRBK_RUN_SCRIPT"
 }
 
+admin_snapper_menu() {
+   local snapper_options=(
+      "Listado de los ultimos snapshots realizados"
+      "Realizar snapshot ahora"
+      "Exportar snapshot GOLDEN a USB"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Admin Tools | Snapper" \
+         "Herramientas de Snapper (snapshots locales)" \
+         snapper_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_show_snapper_snapshots || true ;;
+         1) admin_run_snapper_now || true ;;
+         2) admin_usb_golden_export || true ;;
+         3) return 0 ;;
+      esac
+   done
+}
+
+admin_btrbk_menu() {
+   local btrbk_options=(
+      "Listado de los ultimos snapshots realizados"
+      "Realizar snapshot ahora"
+      "Gestion de particion recovery"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Admin Tools | Btrbk" \
+         "Herramientas de Btrbk (snapshots en recovery)" \
+         btrbk_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_show_btrbk_snapshots || true ;;
+         1) admin_run_btrbk_now || true ;;
+         2) admin_recovery_partition_menu || true ;;
+         3) return 0 ;;
+      esac
+   done
+}
+
 admin_recovery_partition_menu() {
    local recovery_options=(
       "Ver estado actual"
