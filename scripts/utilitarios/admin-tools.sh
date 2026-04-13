@@ -11,9 +11,11 @@ source "${ADMIN_TOOLS_DIR}/lib/admin_actions.sh"
 MAIN_TITLE="Debian Btrfs Admin Tools"
 MAIN_PROMPT="Selecciona una herramienta administrativa:"
 MAIN_OPTIONS=(
-   "Ver contexto de arranque"
-   "Reporte de salud de backups"
-   "Ejecutar btrbk ahora"
+   "Informar estado actual"
+   "Snapper - Listado de los ultimos snapshots realizados"
+   "Btrbk - Listado de los ultimos snapshots realizados"
+   "Snapper - Realizar snapshot ahora"
+   "Btrbk - Realizar snapshot ahora"
    "Gestion de particion recovery"
    "Exportar snapshot GOLDEN a USB"
    "Comparar snapshots"
@@ -43,14 +45,16 @@ main() {
 
       case "$UI_MENU_SELECTED" in
          0) admin_show_boot_context || true ;;
-         1) admin_show_backup_health || true ;;
-         2) admin_run_btrbk_now || true ;;
-         3) admin_recovery_partition_menu || true ;;
-         4) admin_usb_golden_export || true ;;
-         5) admin_snapshot_compare_menu || true ;;
-         6) admin_show_utilitarios_readme || true ;;
-         7) admin_show_help || true ;;
-         8) break ;;
+         1) admin_show_snapper_snapshots || true ;;
+         2) admin_show_btrbk_snapshots || true ;;
+         3) admin_run_snapper_now || true ;;
+         4) admin_run_btrbk_now || true ;;
+         5) admin_recovery_partition_menu || true ;;
+         6) admin_usb_golden_export || true ;;
+         7) admin_snapshot_compare_menu || true ;;
+         8) admin_show_utilitarios_readme || true ;;
+         9) admin_show_help || true ;;
+         10) break ;;
       esac
    done
 }

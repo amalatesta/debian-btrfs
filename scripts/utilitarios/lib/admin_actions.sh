@@ -5,6 +5,7 @@ ADMIN_UTIL_DIR="$(cd "${ADMIN_ACTIONS_DIR}/.." && pwd)"
 
 BOOT_CONTEXT_SCRIPT="${ADMIN_UTIL_DIR}/show-boot-context.sh"
 BACKUP_HEALTH_SCRIPT="${ADMIN_UTIL_DIR}/backup-health-report.sh"
+SNAPPER_RUN_SCRIPT="${ADMIN_UTIL_DIR}/snapper-run-now.sh"
 BTRBK_RUN_SCRIPT="${ADMIN_UTIL_DIR}/btrbk-run-now.sh"
 RECOVERY_SCRIPT="${ADMIN_UTIL_DIR}/recovery-partition.sh"
 USB_GOLDEN_SCRIPT="${ADMIN_UTIL_DIR}/usb-golden-snapshot.sh"
@@ -22,7 +23,7 @@ admin_require_scripts() {
    local missing=0
    local file
 
-   for file in "$BOOT_CONTEXT_SCRIPT" "$BACKUP_HEALTH_SCRIPT" "$BTRBK_RUN_SCRIPT" "$RECOVERY_SCRIPT" "$USB_GOLDEN_SCRIPT" "$SNAPSHOT_COMPARE_SCRIPT"; do
+   for file in "$BOOT_CONTEXT_SCRIPT" "$BACKUP_HEALTH_SCRIPT" "$SNAPPER_RUN_SCRIPT" "$BTRBK_RUN_SCRIPT" "$RECOVERY_SCRIPT" "$USB_GOLDEN_SCRIPT" "$SNAPSHOT_COMPARE_SCRIPT"; do
       if [[ ! -x "$file" ]]; then
          echo "Falta script ejecutable: $file"
          missing=1
@@ -61,15 +62,67 @@ admin_run_report() {
 }
 
 admin_show_boot_context() {
-   admin_run_report "Boot Context" "$BOOT_CONTEXT_SCRIPT"
+   admin_run_report "Estado actual del sistema" "$BOOT_CONTEXT_SCRIPT"
 }
 
-admin_show_backup_health() {
-   admin_run_report "Backup Health Report" "$BACKUP_HEALTH_SCRIPT"
+admin_show_snapper_snapshots() {
+   local snapper_lines=()
+   mapfile -t snapper_lines < <(snapper -c root list)
+   ui_show_text_box "Snapper | Ultimos snapshots locales" snapper_lines
+}
+
+admin_show_btrbk_snapshots() {
+   local mounted_here=0 backup_lines=() backup_info=()
+   
+   backup_info+=("btrbk | Snapshots de recovery")
+   backup_info+=("")
+   
+   if mountpoint -q /mnt/backup; then
+      backup_info+=("Estado: /mnt/backup ya estaba montada")
+   else
+      backup_info+=("Estado: montando /mnt/backup temporalmente...")
+      if ! mount /mnt/backup 2>/dev/null; then
+         backup_info+=("ERROR: no se pudo montar /mnt/backup")
+         ui_show_text_box "btrbk | Snapshots" backup_info
+         return 1
+      fi
+      mounted_here=1
+   fi
+   
+   backup_info+=("")
+   backup_info+=("============================================================")
+   backup_info+=(" Snapshots en /mnt/backup/snapshots")
+   backup_info+=("============================================================")
+   backup_info+=("")
+   
+   if [[ -d /mnt/backup/snapshots ]]; then
+      mapfile -t -O ${#backup_info[@]} backup_info < <(ls -lt /mnt/backup/snapshots)
+   else
+      backup_info+=("Directorio /mnt/backup/snapshots no encontrado")
+   fi
+   
+   backup_info+=("")
+   backup_info+=("============================================================")
+   backup_info+=(" Uso de disco en /mnt/backup")
+   backup_info+=("============================================================")
+   backup_info+=("")
+   mapfile -t -O ${#backup_info[@]} backup_info < <(df -h /mnt/backup)
+   
+   if [[ "$mounted_here" -eq 1 ]]; then
+      umount /mnt/backup 2>/dev/null || true
+      backup_info+=("")
+      backup_info+=("Nota: /mnt/backup fue desmontada (montaje temporal limpiado)")
+   fi
+   
+   ui_show_text_box "btrbk | Snapshots de recovery" backup_info
+}
+
+admin_run_snapper_now() {
+   admin_run_report "Snapper - Realizar snapshot ahora" "$SNAPPER_RUN_SCRIPT"
 }
 
 admin_run_btrbk_now() {
-   admin_run_report "btrbk.service" "$BTRBK_RUN_SCRIPT"
+   admin_run_report "Btrbk - Realizar snapshot ahora" "$BTRBK_RUN_SCRIPT"
 }
 
 admin_recovery_partition_menu() {
@@ -394,13 +447,15 @@ admin_show_help() {
       "Admin Tools centraliza los utilitarios de mantenimiento del proyecto."
       ""
       "Acciones disponibles:"
-      "- Ver contexto de arranque"
-      "- Generar reporte de salud Snapper + btrbk"
-      "- Ejecutar btrbk.service en el flujo seguro"
+      "- Ver contexto de arranque y sistema"
+      "- Listar ultimos snapshots de Snapper"
+      "- Listar ultimos snapshots de btrbk"
+      "- Realizar un snapshot manual con Snapper"
+      "- Realizar un backup/snapshot con btrbk"
       "- Gestionar /mnt/backup manualmente"
       "- Exportar snapshot GOLDEN a USB"
       "- Comparar snapshots desde snapper, btrbk y USB"
-      "- Ver este README tecnico dentro de la UI"
+      "- Ver README tecnico dentro de la UI"
       ""
       "Diseno modular:"
       "- admin-tools.sh: launcher y menu principal"

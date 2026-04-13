@@ -45,7 +45,17 @@ Para que sirve:
 Uso:
 - sudo scripts/utilitarios/backup-health-report.sh
 
-### 3) btrbk-run-now.sh
+### 3) snapper-run-now.sh
+
+Para que sirve:
+- Crea un snapshot manual de Snapper con descripcion automática (fecha/hora).
+- Muestra el ID del snapshot creado y los últimos 10 snapshots.
+- Incluye detalles del snapshot creado.
+
+Uso:
+- sudo scripts/utilitarios/snapper-run-now.sh
+
+### 4) btrbk-run-now.sh
 
 Para que sirve:
 - Ejecuta un backup inmediato usando systemd (btrbk.service), respetando el flujo seguro de montaje/desmontaje.
@@ -54,7 +64,7 @@ Para que sirve:
 Uso:
 - sudo scripts/utilitarios/btrbk-run-now.sh
 
-### 4) recovery-partition.sh
+### 5) recovery-partition.sh
 
 Para que sirve:
 - Gestion rapida de /mnt/backup en tareas manuales de administracion.
@@ -72,7 +82,7 @@ Uso:
 - Remontar read-write:
   - sudo scripts/utilitarios/recovery-partition.sh rw
 
-### 5) usb-golden-snapshot.sh
+### 6) usb-golden-snapshot.sh
 
 Para que sirve:
 - Crea (o reutiliza) un snapshot de Snapper y lo exporta a un USB.
@@ -89,7 +99,7 @@ Uso:
 - Limpiar export local luego de copiar al USB:
   - sudo scripts/utilitarios/usb-golden-snapshot.sh --device /dev/sdX1 --cleanup-local-export
 
-### 6) snapshot-compare.sh
+### 7) snapshot-compare.sh
 
 Para que sirve:
 - Compara snapshots locales de Snapper.
@@ -111,5 +121,6 @@ Uso:
 ## Recomendaciones operativas
 
 - Usar siempre los utilitarios con sudo.
-- Para backups manuales, preferir btrbk-run-now.sh en lugar de ejecutar btrbk run directo.
+- Para snapshots manuales de Snapper, preferir snapper-run-now.sh.
+- Para backups manuales de btrbk, preferir btrbk-run-now.sh en lugar de ejecutar btrbk run directo.
 - Mantener /mnt/backup con noauto en fstab para minimizar exposicion.
