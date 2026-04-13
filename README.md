@@ -24,6 +24,9 @@ El propósito es contar con una guía clara y reproducible que permita:
 **Perfiles de escritorio:**
 - KDE Plasma estilo Windows / AnduinOS-like: [escritorios/KDE_Windows/README.md](escritorios/KDE_Windows/README.md)
 
+**Scripts y utilitarios de administración:**
+- Referencia completa: [scripts/utilitarios/README.md](scripts/utilitarios/README.md)
+
 ---
 
 ## 🟢 Estado de Validación
@@ -124,6 +127,7 @@ El propósito es contar con una guía clara y reproducible que permita:
    - [12.2 Mantenimiento semanal](#122-mantenimiento-semanal)
    - [12.3 Mantenimiento mensual](#123-mantenimiento-mensual)
    - [12.4 Script de verificación automática](#124-script-de-verificación-automática)
+   - [12.5 Mostrar validación automática al iniciar sesión](#125-mostrar-validación-automática-al-iniciar-sesión)
 13. [Próximos Pasos](#13-próximos-pasos)
    - [13.1 Crear snapshot "Sistema base listo"](#131-crear-snapshot-sistema-base-listo)
    - [13.2 Instalar entorno de escritorio](#132-instalar-entorno-de-escritorio)
@@ -2939,13 +2943,20 @@ sudo umount /mnt/backup
 sudo snapper -c root list | tail -3
 ```
 
-**Importante:** Asegurar que en `/etc/fstab` está configurado:
+**Importante (modo seguro recomendado):** mantener `/mnt/btrfs-root` en `noauto`.
 
 ```bash
-UUID=4e10e56c-665e-4b5c-9892-55bb12509de6 /mnt/btrfs-root btrfs subvolid=5,auto,compress=zstd:3 0 0
+UUID=4e10e56c-665e-4b5c-9892-55bb12509de6 /mnt/btrfs-root btrfs noauto,subvolid=5,compress=zstd:3 0 0
 ```
 
-(sin `noauto` para que btrbk.timer funcione automáticamente en cada arranque)
+Y `/mnt/backup` también debe quedar con `noauto`.
+
+`btrbk.timer` sigue funcionando normalmente: dispara `btrbk.service` en horario, y el servicio se encarga de montar y desmontar.
+
+- `ExecStartPre`: monta `/mnt/btrfs-root` y monta (o remonta en `rw`) `/mnt/backup`.
+- `ExecStartPost`: ejecuta `/usr/local/bin/btrbk-postrun.sh`, que intenta desmontar `/mnt/backup` (si no puede, lo remonta en `ro`).
+
+En resumen: no queda montado al arranque; se monta solo cuando corre `btrbk`.
 
 ### 13.2 Instalar entorno de escritorio
 
