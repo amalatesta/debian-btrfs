@@ -1627,6 +1627,1594 @@ run_menu() {
     done
 }
 
+
+# ============================================  
+# BLOQUE: DRY-RUN FUNCTIONS (renombrado dryrun_*)
+# ============================================
+
+DISK=""
+DISK_SIZE_GB=0
+RAM_GB=0
+SUGGESTED_EFI="1G"
+SUGGESTED_SYSTEM_GB=0
+SUGGESTED_SYSTEM_PCT=0
+SUGGESTED_BACKUP_GB=0
+SUGGESTED_SWAP=""
+SWAP_REASON=""
+SUGGESTED_TIMEZONE=""
+SUGGESTED_LOCALE=""
+SUGGESTED_HOSTNAME="debian-pc"
+SUGGESTED_USERNAME="usuario"
+SUGGESTED_USER_PASSWORD_SET="N"
+SUGGESTED_KEYBOARD="us"
+SUGGESTED_KEYBOARD_SOURCE="heuristica"
+SUGGESTED_APT_ENABLE_NONFREE="S"
+SUGGESTED_APT_ENABLE_SECURITY="S"
+SUGGESTED_APT_ENABLE_UPDATES="S"
+SUGGESTED_APT_ENABLE_DEBSRC="N"
+SUGGESTED_APT_PROXY=""
+SUGGESTED_INSTALL_NONFREE_FIRMWARE="S"
+SUGGESTED_ENABLE_POPCON="N"
+SUGGESTED_SOFTWARE_INSTALL_MODE="POSTBOOT"
+SUGGESTED_INSTALL_SSH_IN_BASE="S"
+SUGGESTED_INSTALL_TASKSEL_NOW="N"
+NETWORK_DEFAULT_ROUTE="N"
+NETWORK_WIFI_IFACE=""
+NETWORK_ETH_IFACE=""
+NETWORK_DNS_OK="N"
+CREATE_BACKUP="S"
+SELECTED_EFI_SIZE=""
+SELECTED_EFI_GB=1
+SELECTED_SYSTEM_SIZE=""
+SELECTED_SYSTEM_GB=0
+SELECTED_SWAP_SIZE=""
+SELECTED_CREATE_BACKUP="S"
+SELECTED_LOCALE=""
+SELECTED_TIMEZONE=""
+SELECTED_KEYBOARD=""
+SELECTED_HOSTNAME=""
+SELECTED_USERNAME=""
+SELECTED_USER_PASSWORD_SET="N"
+SELECTED_APT_ENABLE_NONFREE="S"
+SELECTED_APT_ENABLE_SECURITY="S"
+SELECTED_APT_ENABLE_UPDATES="S"
+SELECTED_APT_ENABLE_DEBSRC="N"
+SELECTED_APT_PROXY=""
+SELECTED_INSTALL_NONFREE_FIRMWARE="S"
+SELECTED_ENABLE_POPCON="N"
+SELECTED_SOFTWARE_INSTALL_MODE="POSTBOOT"
+SELECTED_INSTALL_SSH_IN_BASE="S"
+SELECTED_INSTALL_TASKSEL_NOW="N"
+EFFECTIVE_BACKUP_GB=0
+
+dryrun_step() {
+    printf "\n[dry-run][step] %s\n" "$1"
+}
+
+dryrun_ok() {
+    printf "[dry-run][ok] %s\n" "$1"
+}
+
+dryrun_warn() {
+    printf "[dry-run][warn] %s\n" "$1"
+}
+
+dryrun_fail() {
+    printf "[dry-run][error] %s\n" "$1" >&2
+    exit 1
+}
+
+dryrun_info() {
+    printf "[dry-run][info] %s\n" "$1"
+}
+
+dryrun_have_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+dryrun_dryrun_normalize_size_gib() {
+    local raw="$1"
+    raw="${raw// /}"
+    raw="${raw^^}"
+    [[ -z "$raw" ]] && raw="1G"
+    if [[ "$raw" =~ ^[0-9]+$ ]]; then
+        raw="${raw}G"
+    fi
+    printf '%s\n' "$raw"
+}
+
+dryrun_dryrun_size_gib_to_int() {
+    local raw="$1"
+    raw="$(normalize_size_gib "$raw")"
+    if [[ "$raw" =~ ^[0-9]+G$ ]]; then
+        printf '%s\n' "${raw%G}"
+        return 0
+    fi
+    if [[ "$raw" =~ ^[0-9]+M$ ]]; then
+        local mib="${raw%M}"
+        printf '%s\n' "$(( (mib + 1023) / 1024 ))"
+        return 0
+    fi
+    printf '0\n'
+}
+
+dryrun_dryrun_calculate_recommendations() {
+    if [[ -z "$DRYRUN_DISK" ]]; then
+        warn "no hay disco sugerido; no se pueden calcular recomendaciones"
+        return 1
+    fi
+
+    RAM_GB="$(free -m 2>/dev/null | awk '/^Mem:/{print int($2/1024)}')"
+    [[ -z "$DRYRUN_RAM_GB" ]] && RAM_GB=0
+
+    if [[ $DRYRUN_DISK_SIZE_GB -lt 128 ]]; then
+        SUGGESTED_SYSTEM_PCT=90
+    elif [[ $DRYRUN_DISK_SIZE_GB -lt 256 ]]; then
+        SUGGESTED_SYSTEM_PCT=85
+    else
+        SUGGESTED_SYSTEM_PCT=80
+    fi
+
+    SUGGESTED_SYSTEM_GB=$((DISK_SIZE_GB * SUGGESTED_SYSTEM_PCT / 100))
+    SUGGESTED_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - 1))
+    if (( SUGGESTED_BACKUP_GB <= 0 )); then
+        SUGGESTED_BACKUP_GB=0
+        CREATE_BACKUP="N"
+    else
+        CREATE_BACKUP="S"
+    fi
+
+    if [[ $DRYRUN_RAM_GB -le 2 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (sistema con poca memoria)"
+    elif [[ $DRYRUN_RAM_GB -le 8 ]]; then
+        SUGGESTED_SWAP="$((RAM_GB * 2))G"
+        SWAP_REASON="2x RAM (permite hibernacion)"
+    elif [[ $DRYRUN_RAM_GB -le 16 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM (permite hibernacion)"
+    else
+        SUGGESTED_SWAP="8G"
+        SWAP_REASON="8GB fijo (RAM suficiente)"
+    fi
+
+    if grep -qiE 'laptop|notebook' /sys/class/dmi/id/product_name 2>/dev/null; then
+        SUGGESTED_HOSTNAME="debian-laptop"
+    else
+        SUGGESTED_HOSTNAME="debian-pc"
+    fi
+
+    SUGGESTED_TIMEZONE="$(cat /etc/timezone 2>/dev/null || true)"
+    [[ -z "$DRYRUN_SUGGESTED_TIMEZONE" ]] && SUGGESTED_TIMEZONE="UTC"
+
+    SUGGESTED_LOCALE="$(locale 2>/dev/null | awk -F= '/^LANG=/{print $2; exit}')"
+    [[ -z "$DRYRUN_SUGGESTED_LOCALE" ]] && SUGGESTED_LOCALE="en_US.UTF-8"
+
+    if [[ -f /etc/default/keyboard ]]; then
+        local kb_layout
+        kb_layout="$(awk -F= '/^XKBLAYOUT=/{gsub(/"/,"",$2); print $2; exit}' /etc/default/keyboard 2>/dev/null || true)"
+        if [[ -n "$kb_layout" ]]; then
+            SUGGESTED_KEYBOARD="$kb_layout"
+            SUGGESTED_KEYBOARD_SOURCE="system-file"
+        fi
+    fi
+
+    if [[ "$DRYRUN_SUGGESTED_KEYBOARD_SOURCE" != "system-file" ]]; then
+        if [[ "$DRYRUN_SUGGESTED_LOCALE" == es_* ]]; then
+            SUGGESTED_KEYBOARD="es"
+        else
+            SUGGESTED_KEYBOARD="us"
+        fi
+        SUGGESTED_KEYBOARD_SOURCE="heuristica"
+    fi
+
+    SELECTED_EFI_SIZE="$(normalize_size_gib "${DRYRUN_EFI_SIZE:-$DRYRUN_SUGGESTED_EFI}")"
+    SELECTED_EFI_GB="$(size_gib_to_int "$DRYRUN_SELECTED_EFI_SIZE")"
+    if (( SELECTED_EFI_GB < 1 )); then
+        SELECTED_EFI_SIZE="$DRYRUN_SUGGESTED_EFI"
+        SELECTED_EFI_GB="$(size_gib_to_int "$DRYRUN_SELECTED_EFI_SIZE")"
+    fi
+
+    SELECTED_SYSTEM_SIZE="$(normalize_size_gib "${DRYRUN_SYSTEM_SIZE:-${SUGGESTED_SYSTEM_GB}G}")"
+    SELECTED_SYSTEM_GB="$(size_gib_to_int "$DRYRUN_SELECTED_SYSTEM_SIZE")"
+    if (( SELECTED_SYSTEM_GB < 16 )); then
+        SELECTED_SYSTEM_SIZE="${SUGGESTED_SYSTEM_GB}G"
+        SELECTED_SYSTEM_GB="$DRYRUN_SUGGESTED_SYSTEM_GB"
+    fi
+
+    SELECTED_SWAP_SIZE="$(normalize_size_gib "${DRYRUN_SWAP_SIZE:-$DRYRUN_SUGGESTED_SWAP}")"
+    if (( $(size_gib_to_int "$DRYRUN_SELECTED_SWAP_SIZE") < 1 )); then
+        SELECTED_SWAP_SIZE="$DRYRUN_SUGGESTED_SWAP"
+    fi
+
+    SELECTED_CREATE_BACKUP="${DRYRUN_CREATE_BACKUP:-$DRYRUN_CREATE_BACKUP}"
+    SELECTED_CREATE_BACKUP="${SELECTED_CREATE_BACKUP^^}"
+    if [[ "$DRYRUN_SELECTED_CREATE_BACKUP" != "S" ]]; then
+        SELECTED_CREATE_BACKUP="N"
+    fi
+
+    SELECTED_LOCALE="${DRYRUN_LOCALE:-$DRYRUN_SUGGESTED_LOCALE}"
+    SELECTED_TIMEZONE="${DRYRUN_TIMEZONE:-$DRYRUN_SUGGESTED_TIMEZONE}"
+    SELECTED_KEYBOARD="${DRYRUN_KEYBOARD:-$DRYRUN_SUGGESTED_KEYBOARD}"
+    SELECTED_HOSTNAME="${DRYRUN_HOSTNAME:-$DRYRUN_SUGGESTED_HOSTNAME}"
+    SELECTED_USERNAME="${DRYRUN_USERNAME:-$DRYRUN_SUGGESTED_USERNAME}"
+
+    SELECTED_USER_PASSWORD_SET="${DRYRUN_USER_PASSWORD_SET:-$DRYRUN_SUGGESTED_USER_PASSWORD_SET}"
+    SELECTED_USER_PASSWORD_SET="${SELECTED_USER_PASSWORD_SET^^}"
+    [[ "$DRYRUN_SELECTED_USER_PASSWORD_SET" != "S" ]] && SELECTED_USER_PASSWORD_SET="N"
+
+    SELECTED_APT_ENABLE_NONFREE="${DRYRUN_APT_ENABLE_NONFREE:-$DRYRUN_SUGGESTED_APT_ENABLE_NONFREE}"
+    SELECTED_APT_ENABLE_NONFREE="${SELECTED_APT_ENABLE_NONFREE^^}"
+    [[ "$DRYRUN_SELECTED_APT_ENABLE_NONFREE" != "S" ]] && SELECTED_APT_ENABLE_NONFREE="N"
+
+    SELECTED_APT_ENABLE_SECURITY="${DRYRUN_APT_ENABLE_SECURITY:-$DRYRUN_SUGGESTED_APT_ENABLE_SECURITY}"
+    SELECTED_APT_ENABLE_SECURITY="${SELECTED_APT_ENABLE_SECURITY^^}"
+    [[ "$DRYRUN_SELECTED_APT_ENABLE_SECURITY" != "S" ]] && SELECTED_APT_ENABLE_SECURITY="N"
+
+    SELECTED_APT_ENABLE_UPDATES="${DRYRUN_APT_ENABLE_UPDATES:-$DRYRUN_SUGGESTED_APT_ENABLE_UPDATES}"
+    SELECTED_APT_ENABLE_UPDATES="${SELECTED_APT_ENABLE_UPDATES^^}"
+    [[ "$DRYRUN_SELECTED_APT_ENABLE_UPDATES" != "S" ]] && SELECTED_APT_ENABLE_UPDATES="N"
+
+    SELECTED_APT_ENABLE_DEBSRC="${DRYRUN_APT_ENABLE_DEBSRC:-$DRYRUN_SUGGESTED_APT_ENABLE_DEBSRC}"
+    SELECTED_APT_ENABLE_DEBSRC="${SELECTED_APT_ENABLE_DEBSRC^^}"
+    [[ "$DRYRUN_SELECTED_APT_ENABLE_DEBSRC" != "S" ]] && SELECTED_APT_ENABLE_DEBSRC="N"
+
+    SELECTED_APT_PROXY="${DRYRUN_APT_PROXY:-$DRYRUN_SUGGESTED_APT_PROXY}"
+
+    SELECTED_INSTALL_NONFREE_FIRMWARE="${DRYRUN_INSTALL_NONFREE_FIRMWARE:-$DRYRUN_SUGGESTED_INSTALL_NONFREE_FIRMWARE}"
+    SELECTED_INSTALL_NONFREE_FIRMWARE="${SELECTED_INSTALL_NONFREE_FIRMWARE^^}"
+    [[ "$DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE" != "S" ]] && SELECTED_INSTALL_NONFREE_FIRMWARE="N"
+
+    SELECTED_ENABLE_POPCON="${DRYRUN_ENABLE_POPCON:-$DRYRUN_SUGGESTED_ENABLE_POPCON}"
+    SELECTED_ENABLE_POPCON="${SELECTED_ENABLE_POPCON^^}"
+    [[ "$DRYRUN_SELECTED_ENABLE_POPCON" != "S" ]] && SELECTED_ENABLE_POPCON="N"
+
+    SELECTED_SOFTWARE_INSTALL_MODE="${DRYRUN_SOFTWARE_INSTALL_MODE:-$DRYRUN_SUGGESTED_SOFTWARE_INSTALL_MODE}"
+    SELECTED_SOFTWARE_INSTALL_MODE="${SELECTED_SOFTWARE_INSTALL_MODE^^}"
+    case "$DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE" in
+        AUTO|INTERACTIVE|POSTBOOT) : ;;
+        *) SELECTED_SOFTWARE_INSTALL_MODE="$DRYRUN_SUGGESTED_SOFTWARE_INSTALL_MODE" ;;
+    esac
+
+    SELECTED_INSTALL_SSH_IN_BASE="${DRYRUN_INSTALL_SSH_IN_BASE:-$DRYRUN_SUGGESTED_INSTALL_SSH_IN_BASE}"
+    SELECTED_INSTALL_SSH_IN_BASE="${SELECTED_INSTALL_SSH_IN_BASE^^}"
+    [[ "$DRYRUN_SELECTED_INSTALL_SSH_IN_BASE" != "S" ]] && SELECTED_INSTALL_SSH_IN_BASE="N"
+
+    SELECTED_INSTALL_TASKSEL_NOW="${DRYRUN_INSTALL_TASKSEL_NOW:-$DRYRUN_SUGGESTED_INSTALL_TASKSEL_NOW}"
+    SELECTED_INSTALL_TASKSEL_NOW="${SELECTED_INSTALL_TASKSEL_NOW^^}"
+    [[ "$DRYRUN_SELECTED_INSTALL_TASKSEL_NOW" != "S" ]] && SELECTED_INSTALL_TASKSEL_NOW="N"
+
+    EFFECTIVE_BACKUP_GB=$((DISK_SIZE_GB - SELECTED_SYSTEM_GB - SELECTED_EFI_GB))
+    if (( EFFECTIVE_BACKUP_GB <= 0 )); then
+        EFFECTIVE_BACKUP_GB=0
+        SELECTED_CREATE_BACKUP="N"
+    fi
+}
+
+dryrun_dryrun_print_defaults() {
+    detect_suggested_disk || return 1
+    calculate_recommendations || return 1
+
+    printf 'DRYRUN_DEFAULT_DISK=%s\n' "$DRYRUN_DISK"
+    printf 'DRYRUN_DEFAULT_EFI=%s\n' "$DRYRUN_SUGGESTED_EFI"
+    printf 'DRYRUN_DEFAULT_SYSTEM=%sG\n' "$DRYRUN_SUGGESTED_SYSTEM_GB"
+    printf 'DRYRUN_DEFAULT_BACKUP=%sG\n' "$DRYRUN_SUGGESTED_BACKUP_GB"
+    printf 'DRYRUN_DEFAULT_CREATE_BACKUP=%s\n' "$DRYRUN_CREATE_BACKUP"
+    printf 'DRYRUN_DEFAULT_SWAP=%s\n' "$DRYRUN_SUGGESTED_SWAP"
+    printf 'DRYRUN_DEFAULT_LOCALE=%s\n' "$DRYRUN_SUGGESTED_LOCALE"
+    printf 'DRYRUN_DEFAULT_TIMEZONE=%s\n' "$DRYRUN_SUGGESTED_TIMEZONE"
+    printf 'DRYRUN_DEFAULT_HOSTNAME=%s\n' "$DRYRUN_SUGGESTED_HOSTNAME"
+    printf 'DRYRUN_DEFAULT_KEYBOARD=%s\n' "$DRYRUN_SUGGESTED_KEYBOARD"
+    printf 'DRYRUN_DEFAULT_KEYBOARD_SOURCE=%s\n' "$DRYRUN_SUGGESTED_KEYBOARD_SOURCE"
+}
+
+dryrun_dryrun_analyze_memory() {
+    step "1/9 - Analisis de memoria"
+
+    if [[ ! -f /proc/meminfo ]]; then
+        warn "no se puede leer /proc/meminfo"
+        return 1
+    fi
+
+    local total_kb used_kb available_kb percent_used
+    total_kb="$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')"
+    available_kb="$(grep '^MemAvailable:' /proc/meminfo | awk '{print $2}')"
+    used_kb=$((total_kb - available_kb))
+    percent_used=$((100 * used_kb / total_kb))
+
+    local total_gb used_gb available_gb
+    total_gb=$((total_kb / 1024 / 1024))
+    used_gb=$((used_kb / 1024 / 1024))
+    available_gb=$((available_kb / 1024 / 1024))
+
+    printf "[dry-run] RAM total: %sGB\n" "$total_gb"
+    printf "[dry-run] RAM usada: %sGB (%s%%)\n" "$used_gb" "$percent_used"
+    printf "[dry-run] RAM disponible: %sGB\n" "$available_gb"
+
+    if (( available_gb < 2 )); then
+        warn "memoria insuficiente (<2GB); instalacion posible pero lenta"
+    else
+        ok "memoria suficiente"
+    fi
+
+    if [[ -f /proc/swaps ]]; then
+        local swap_total
+        swap_total="$(tail -n +2 /proc/swaps | awk '{sum+=$3} END{print sum}')"
+        if [[ -z "$swap_total" ]] || (( swap_total == 0 )); then
+            info "no hay swap configurado"
+        else
+            local swap_gb
+            swap_gb=$((swap_total / 1024 / 1024))
+            printf "[dry-run] swap disponible: %sGB\n" "$swap_gb"
+        fi
+    fi
+}
+
+dryrun_dryrun_analyze_cpu() {
+    step "2/9 - Analisis de CPU"
+
+    if [[ ! -f /proc/cpuinfo ]]; then
+        warn "no se puede leer /proc/cpuinfo"
+        return 1
+    fi
+
+    local cpu_count cpu_model
+    cpu_count="$(grep -c '^processor' /proc/cpuinfo)"
+    cpu_model="$(grep '^model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)"
+
+    printf "[dry-run] CPUs: %s\n" "$cpu_count"
+    printf "[dry-run] modelo: %s\n" "$cpu_model"
+
+    if (( cpu_count < 2 )); then
+        warn "CPU limitada (1 core); compilacion y instalacion seran lentas"
+    else
+        ok "CPU multiples cores disponibles"
+    fi
+
+    if have_cmd nproc; then
+        local available_procs
+        available_procs="$(nproc)"
+        printf "[dry-run] procesos paralelos disponibles: %s\n" "$available_procs"
+    fi
+}
+
+dryrun_dryrun_detect_suggested_disk() {
+    local root_source live_root_disk candidate_name candidate_size
+    local -a candidates
+    local best_size=0
+
+    candidates=()
+
+    if have_cmd findmnt; then
+        root_source="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+        live_root_disk="$(lsblk -ndo PKNAME "$root_source" 2>/dev/null || true)"
+    fi
+
+    while IFS='|' read -r candidate_name candidate_size; do
+        [[ -z "$candidate_name" ]] && continue
+        candidates+=("${candidate_name}|${candidate_size}")
+    done < <(lsblk -bdn -o NAME,SIZE,TYPE 2>/dev/null | awk '$3=="disk"{print $1"|"int($2/1024/1024/1024)}')
+
+    if (( ${#candidates[@]} == 0 )); then
+        warn "no se detectaron discos para simulacion"
+        return 1
+    fi
+
+    for candidate in "${candidates[@]}"; do
+        IFS='|' read -r candidate_name candidate_size <<< "$candidate"
+        if [[ -n "$live_root_disk" && "$candidate_name" == "$live_root_disk" ]]; then
+            continue
+        fi
+        if (( candidate_size > best_size )); then
+            DISK="/dev/${candidate_name}"
+            best_size=$candidate_size
+        fi
+    done
+
+    if [[ -z "$DRYRUN_DISK" ]]; then
+        IFS='|' read -r candidate_name candidate_size <<< "${candidates[0]}"
+        DISK="/dev/${candidate_name}"
+        best_size=$candidate_size
+    fi
+
+    DISK_SIZE_GB=$best_size
+    ok "disco sugerido para simulacion: ${DISK} (${DISK_SIZE_GB}GB)"
+}
+
+dryrun_dryrun_analyze_and_suggest() {
+    step "8/9 - Calculo de sugerencias como opcion 1"
+    calculate_recommendations || return 1
+
+    printf "[dry-run] disco objetivo sugerido: %s\n" "$DRYRUN_DISK"
+    printf "[dry-run] capacidad usada para calculo: %sGB\n" "$DRYRUN_DISK_SIZE_GB"
+    printf "[dry-run] RAM usada para calculo: %sGB\n" "$DRYRUN_RAM_GB"
+    printf "[dry-run] Sugerido --> EFI: %s\n" "$DRYRUN_SUGGESTED_EFI"
+    printf "[dry-run] Elegido  --> EFI: %s\n" "$DRYRUN_SELECTED_EFI_SIZE"
+
+    printf "[dry-run] Sugerido --> Sistema: %sG (%s%% del disco)\n" "$DRYRUN_SUGGESTED_SYSTEM_GB" "$DRYRUN_SUGGESTED_SYSTEM_PCT"
+    printf "[dry-run] Elegido  --> Sistema: %s\n" "$DRYRUN_SELECTED_SYSTEM_SIZE"
+
+    if [[ "$DRYRUN_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Sugerido --> Backup: %sG\n" "$DRYRUN_SUGGESTED_BACKUP_GB"
+    else
+        printf "[dry-run] Sugerido --> Backup: no crear (sin espacio suficiente)\n"
+    fi
+
+    if [[ "$DRYRUN_SELECTED_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run] Elegido  --> Backup: %sG\n" "$DRYRUN_EFFECTIVE_BACKUP_GB"
+    else
+        printf "[dry-run] Elegido  --> Backup: no crear\n"
+    fi
+
+    printf "[dry-run] Sugerido --> Swapfile: %s (%s)\n" "$DRYRUN_SUGGESTED_SWAP" "$SWAP_REASON"
+    printf "[dry-run] Elegido  --> Swapfile: %s\n" "$DRYRUN_SELECTED_SWAP_SIZE"
+
+    printf "[dry-run] Sugerido --> Hostname: %s\n" "$DRYRUN_SUGGESTED_HOSTNAME"
+    printf "[dry-run] Elegido  --> Hostname: %s\n" "$DRYRUN_SELECTED_HOSTNAME"
+    printf "[dry-run] Sugerido --> Usuario: %s\n" "$DRYRUN_SUGGESTED_USERNAME"
+    printf "[dry-run] Elegido  --> Usuario: %s\n" "$DRYRUN_SELECTED_USERNAME"
+    printf "[dry-run] Sugerido --> Password usuario definida: %s\n" "$DRYRUN_SUGGESTED_USER_PASSWORD_SET"
+    printf "[dry-run] Elegido  --> Password usuario definida: %s\n" "$DRYRUN_SELECTED_USER_PASSWORD_SET"
+
+    printf "[dry-run] Sugerido --> Timezone: %s\n" "$DRYRUN_SUGGESTED_TIMEZONE"
+    printf "[dry-run] Elegido  --> Timezone: %s\n" "$DRYRUN_SELECTED_TIMEZONE"
+
+    printf "[dry-run] Sugerido --> Locale: %s\n" "$DRYRUN_SUGGESTED_LOCALE"
+    printf "[dry-run] Elegido  --> Locale: %s\n" "$DRYRUN_SELECTED_LOCALE"
+    printf "[dry-run] Sugerido --> Teclado: %s\n" "$DRYRUN_SUGGESTED_KEYBOARD"
+    printf "[dry-run] Elegido  --> Teclado: %s\n" "$DRYRUN_SELECTED_KEYBOARD"
+
+    printf "[dry-run] Sugerido --> APT non-free: %s\n" "$DRYRUN_SUGGESTED_APT_ENABLE_NONFREE"
+    printf "[dry-run] Elegido  --> APT non-free: %s\n" "$DRYRUN_SELECTED_APT_ENABLE_NONFREE"
+    printf "[dry-run] Sugerido --> APT security: %s\n" "$DRYRUN_SUGGESTED_APT_ENABLE_SECURITY"
+    printf "[dry-run] Elegido  --> APT security: %s\n" "$DRYRUN_SELECTED_APT_ENABLE_SECURITY"
+    printf "[dry-run] Sugerido --> APT updates: %s\n" "$DRYRUN_SUGGESTED_APT_ENABLE_UPDATES"
+    printf "[dry-run] Elegido  --> APT updates: %s\n" "$DRYRUN_SELECTED_APT_ENABLE_UPDATES"
+    printf "[dry-run] Sugerido --> APT deb-src: %s\n" "$DRYRUN_SUGGESTED_APT_ENABLE_DEBSRC"
+    printf "[dry-run] Elegido  --> APT deb-src: %s\n" "$DRYRUN_SELECTED_APT_ENABLE_DEBSRC"
+    printf "[dry-run] Sugerido --> APT proxy: %s\n" "${SUGGESTED_APT_PROXY:-<sin proxy>}"
+    printf "[dry-run] Elegido  --> APT proxy: %s\n" "${SELECTED_APT_PROXY:-<sin proxy>}"
+    printf "[dry-run] Sugerido --> Firmware no libre: %s\n" "$DRYRUN_SUGGESTED_INSTALL_NONFREE_FIRMWARE"
+    printf "[dry-run] Elegido  --> Firmware no libre: %s\n" "$DRYRUN_SELECTED_INSTALL_NONFREE_FIRMWARE"
+    printf "[dry-run] Sugerido --> popularity-contest: %s\n" "$DRYRUN_SUGGESTED_ENABLE_POPCON"
+    printf "[dry-run] Elegido  --> popularity-contest: %s\n" "$DRYRUN_SELECTED_ENABLE_POPCON"
+    printf "[dry-run] Sugerido --> Modo software: %s\n" "$DRYRUN_SUGGESTED_SOFTWARE_INSTALL_MODE"
+    printf "[dry-run] Elegido  --> Modo software: %s\n" "$DRYRUN_SELECTED_SOFTWARE_INSTALL_MODE"
+    printf "[dry-run] Sugerido --> SSH en base: %s\n" "$DRYRUN_SUGGESTED_INSTALL_SSH_IN_BASE"
+    printf "[dry-run] Elegido  --> SSH en base: %s\n" "$DRYRUN_SELECTED_INSTALL_SSH_IN_BASE"
+    printf "[dry-run] Sugerido --> tasksel ahora: %s\n" "$DRYRUN_SUGGESTED_INSTALL_TASKSEL_NOW"
+    printf "[dry-run] Elegido  --> tasksel ahora: %s\n" "$DRYRUN_SELECTED_INSTALL_TASKSEL_NOW"
+
+    ok "recomendaciones calculadas con la misma base de opcion 1"
+}
+
+dryrun_dryrun_print_header() {
+    printf "[dry-run] === DEBIAN BTRFS INSTALLER - DRY-RUN ANALYSIS ===\n"
+    printf "[dry-run] repo: %s\n" "$REPO_ROOT"
+    printf "[dry-run] objetivo: validar sistema sin tocar disco\n"
+    printf "[dry-run] fecha: %s\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf "\n"
+}
+
+dryrun_dryrun_check_environment() {
+    step "3/9 - Validaciones de entorno"
+
+    if ! have_cmd bash; then
+        fail "bash no disponible"
+    fi
+    ok "bash disponible"
+
+    if have_cmd tput; then
+        ok "tput disponible"
+    else
+        warn "tput no disponible (continuando)"
+    fi
+
+    if have_cmd lsblk; then
+        ok "lsblk disponible"
+    else
+        warn "lsblk no disponible (analisis de discos limitado)"
+    fi
+
+    if have_cmd findmnt; then
+        ok "findmnt disponible"
+    else
+        warn "findmnt no disponible (deteccion de raiz limitada)"
+    fi
+
+    if have_cmd awk; then
+        ok "awk disponible"
+    else
+        fail "awk no disponible"
+    fi
+
+    if have_cmd sed; then
+        ok "sed disponible"
+    else
+        fail "sed no disponible"
+    fi
+}
+
+dryrun_dryrun_detect_runtime_context() {
+    step "4/9 - Contexto de ejecucion"
+
+    local kernel user uid_value root_fs root_src
+    kernel="$(uname -sr 2>/dev/null || echo desconocido)"
+    user="${USER:-desconocido}"
+    uid_value="$(id -u 2>/dev/null || echo n/a)"
+
+    printf "[dry-run] kernel: %s\n" "$kernel"
+    printf "[dry-run] usuario: %s (uid=%s)\n" "$user" "$uid_value"
+
+    if [[ "${uid_value}" != "0" ]]; then
+        warn "no se ejecuta como root; algunas lecturas podrian estar limitadas"
+    else
+        ok "ejecutando como root"
+    fi
+
+    if have_cmd findmnt; then
+        root_fs="$(findmnt -n -o FSTYPE / 2>/dev/null || true)"
+        root_src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+        [[ -n "$root_fs" ]] && printf "[dry-run] fs raiz: %s\n" "$root_fs"
+        [[ -n "$root_src" ]] && printf "[dry-run] origen raiz: %s\n" "$root_src"
+    fi
+}
+
+dryrun_dryrun_verify_disk_space() {
+    step "5/9 - Verificacion de espacio en disco"
+
+    if ! have_cmd df; then
+        warn "df no disponible; verificacion saltada"
+        return 0
+    fi
+
+    local root_available root_size
+    root_available="$(df -BG / 2>/dev/null | awk 'NR==2{print $4}' | sed 's/G$//')"
+    root_size="$(df -BG / 2>/dev/null | awk 'NR==2{print $2}' | sed 's/G$//')"
+
+    printf "[dry-run] espacio total en /: %sGB\n" "$root_size"
+    printf "[dry-run] espacio disponible en /: %sGB\n" "$root_available"
+
+    local min_required
+    min_required=20
+
+    if (( root_available < min_required )); then
+        warn "espacio insuficiente (<${min_required}GB); instalacion dificil o imposible"
+    else
+        ok "espacio suficiente para instalacion"
+    fi
+
+    if (( root_available < 50 )); then
+        info "recomendacion: considerar espacio >= 50GB para comodidad"
+    fi
+}
+
+dryrun_dryrun_detect_storage() {
+    step "6/9 - Deteccion de hardware y particiones"
+
+    if ! have_cmd lsblk; then
+        warn "omitiendo deteccion de discos porque lsblk no esta disponible"
+        return 0
+    fi
+
+    local disks_count nvme_count ssd_count hdd_count
+    disks_count="$(lsblk -d -n -o NAME 2>/dev/null | sed '/^$/d' | wc -l | awk '{print $1}')"
+    nvme_count="$(lsblk -d -n -o NAME 2>/dev/null | grep -c '^nvme' || true)"
+    ssd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==0{c++} END{print c+0}')"
+    hdd_count="$(lsblk -d -n -o ROTA 2>/dev/null | awk '$1==1{c++} END{print c+0}')"
+
+    printf "[dry-run] discos detectados: %s\n" "$disks_count"
+    printf "[dry-run] tipo aprox: nvme=%s ssd=%s hdd=%s\n" "$nvme_count" "$ssd_count" "$hdd_count"
+
+    printf "[dry-run] tabla de bloques (resumen):\n"
+    lsblk -e7 -o NAME,TYPE,SIZE,FSTYPE,MOUNTPOINTS 2>/dev/null | sed 's/^/[dry-run]   /'
+
+    local btrfs_parts efi_parts
+    btrfs_parts="$(lsblk -nr -o NAME,FSTYPE 2>/dev/null | awk '$2=="btrfs"{c++} END{print c+0}')"
+    efi_parts="$(lsblk -nr -o NAME,FSTYPE,PARTTYPE 2>/dev/null | awk '$2=="vfat" || tolower($3)=="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"{c++} END{print c+0}')"
+
+    printf "[dry-run] particiones btrfs detectadas: %s\n" "$btrfs_parts"
+    printf "[dry-run] particiones EFI detectadas (aprox): %s\n" "$efi_parts"
+
+    detect_suggested_disk || true
+}
+
+dryrun_dryrun_analyze_network() {
+    step "7/9 - Estado de red (requisito del entorno)"
+
+    if ! have_cmd ip; then
+        warn "ip no disponible; analisis de red limitado"
+        return 0
+    fi
+
+    local iface_path iface_name
+    for iface_path in /sys/class/net/*; do
+        iface_name="${iface_path##*/}"
+        [[ "$iface_name" == "lo" ]] && continue
+        if [[ -d "$iface_path/wireless" ]]; then
+            NETWORK_WIFI_IFACE="$iface_name"
+        elif [[ -f "$iface_path/carrier" ]] && [[ "$(cat "$iface_path/carrier" 2>/dev/null || true)" == "1" ]]; then
+            NETWORK_ETH_IFACE="$iface_name"
+        fi
+    done
+
+    if ip route show default 2>/dev/null | grep -q .; then
+        NETWORK_DEFAULT_ROUTE="S"
+    fi
+
+    if have_cmd getent && getent hosts deb.debian.org >/dev/null 2>&1; then
+        NETWORK_DNS_OK="S"
+    fi
+
+    printf "[dry-run] interfaz ethernet: %s\n" "${NETWORK_ETH_IFACE:-no detectada}"
+    printf "[dry-run] interfaz wifi: %s\n" "${NETWORK_WIFI_IFACE:-no detectada}"
+    printf "[dry-run] ruta por defecto: %s\n" "$DRYRUN_NETWORK_DEFAULT_ROUTE"
+    printf "[dry-run] DNS funcional: %s\n" "$DRYRUN_NETWORK_DNS_OK"
+    printf "[dry-run] requisito actual: salida a Internet preferentemente por Ethernet\n"
+
+    if [[ "$DRYRUN_NETWORK_DEFAULT_ROUTE" == "S" ]]; then
+        ok "red operativa para continuar"
+    elif [[ -n "$DRYRUN_NETWORK_ETH_IFACE" ]]; then
+        warn "hay interfaz ethernet, pero sin conectividad valida"
+    elif [[ -n "$DRYRUN_NETWORK_WIFI_IFACE" ]]; then
+        warn "hay Wi-Fi detectada, pero este flujo queda como requisito del entorno live"
+    else
+        warn "sin conectividad lista; la instalacion debe asumir Ethernet/Internet como requisito"
+    fi
+}
+
+dryrun_dryrun_print_preview_plan() {
+    step "9/9 - Simulacion del plan de instalacion"
+
+    printf "\n[dry-run] === PLAN DE PARTICIONES ===\n\n"
+    printf "[dry-run] EFI:\n"
+    printf "[dry-run]   Sugerido --> %s   FAT32   /boot/efi\n" "$DRYRUN_SUGGESTED_EFI"
+    printf "[dry-run]   Elegido  --> %s   FAT32   /boot/efi\n" "$DRYRUN_SELECTED_EFI_SIZE"
+
+    printf "\n[dry-run] SISTEMA (BTRFS raiz):\n"
+    printf "[dry-run]   Sugerido --> %sG   BTRFS   /\n" "$DRYRUN_SUGGESTED_SYSTEM_GB"
+    printf "[dry-run]   Elegido  --> %s   BTRFS   /\n" "$DRYRUN_SELECTED_SYSTEM_SIZE"
+
+    printf "\n[dry-run] BACKUP (BTRFS opcional):\n"
+    if [[ "$DRYRUN_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run]   Sugerido --> %sG   BTRFS   (desmontada)\n" "$DRYRUN_SUGGESTED_BACKUP_GB"
+    else
+        printf "[dry-run]   Sugerido --> omitida por espacio\n"
+    fi
+    if [[ "$DRYRUN_SELECTED_CREATE_BACKUP" == "S" ]]; then
+        printf "[dry-run]   Elegido  --> %sG   BTRFS   (desmontada)\n" "$DRYRUN_EFFECTIVE_BACKUP_GB"
+    else
+        printf "[dry-run]   Elegido  --> omitida\n"
+    fi
+
+    printf "\n[dry-run] === SWAP ===\n"
+    printf "[dry-run]   Sugerido --> %s   (en subvol @swap)\n" "$DRYRUN_SUGGESTED_SWAP"
+    printf "[dry-run]   Elegido  --> %s   (en subvol @swap)\n" "$DRYRUN_SELECTED_SWAP_SIZE"
+
+    cat <<'EOF'
+
+[dry-run] === SUBVOLUMENES BTRFS ===
+[dry-run]   - @           -> raiz del sistema (/)
+[dry-run]   - @home       -> datos de usuario (/home)
+[dry-run]   - @snapshots  -> base para snapshots (/.snapshots)
+[dry-run]   - @swap       -> contenedor del swapfile
+
+[dry-run] === PASO A PASO EN INSTALACION REAL ===
+[dry-run]   1) Confirmar disco objetivo y schema GPT/UEFI
+[dry-run]   2) Crear/validar particiones (EFI, SISTEMA, BACKUP)
+[dry-run]   3) Crear subvolumenes estándar (@, @home, @snapshots, @swap)
+[dry-run]   4) Montar con opciones de rendimiento y generar fstab
+[dry-run]   5) Instalar sistema base + Grub + herramientas Btrfs
+[dry-run]   6) Validar arranque y preparar snapshots iniciales
+
+[dry-run] === COMANDOS DE REFERENCIA ===
+[dry-run]   - lsblk -f               (ver estructura)
+[dry-run]   - blkid                  (verificar particiones)
+[dry-run]   - btrfs subvolume list / (ver subvolumenes)
+[dry-run]   - mount | grep btrfs     (ver montajes activos)
+EOF
+
+    ok "preview generado sin operaciones destructivas"
+}
+
+main() {
+    print_header
+    analyze_memory
+    printf "\n"
+    analyze_cpu
+    printf "\n"
+    check_environment
+    printf "\n"
+    detect_runtime_context
+    printf "\n"
+    verify_disk_space
+    printf "\n"
+    detect_storage
+    printf "\n"
+    analyze_network
+    printf "\n"
+    analyze_and_suggest
+    printf "\n"
+    print_preview_plan
+
+    printf "\n[dry-run] ==========================================\n"
+    printf "[dry-run] RESULTADO: Analisis completado exitosamente\n"
+    printf "[dry-run] ==========================================\n"
+}
+
+# ============================================
+# BLOQUE: INSTALL FUNCTIONS (renombrado install_*)
+# ============================================
+
+# ============================================
+# ESTADO RUNTIME
+# ============================================
+
+INSTALL_DISK=""
+INSTALL_DISK_SIZE_GB=0
+INSTALL_RAM_GB=0
+INSTALL_EFI_PART=""
+INSTALL_SYSTEM_PART=""
+INSTALL_BACKUP_PART=""
+EFI_UUID=""
+SYSTEM_UUID=""
+BACKUP_UUID=""
+MOUNTED_TARGET="false"
+MOUNTED_CHROOT_BIND="false"
+GRUB_BTRFS_INSTALLED="N"
+
+INSTALL_SUGGESTED_EFI="1G"
+INSTALL_SUGGESTED_SYSTEM_GB=0
+INSTALL_SUGGESTED_SYSTEM_PCT=0
+INSTALL_SUGGESTED_BACKUP_GB=0
+INSTALL_SUGGESTED_SWAP=""
+SWAP_REASON=""
+INSTALL_SUGGESTED_HOSTNAME="debian-pc"
+INSTALL_SUGGESTED_USERNAME="usuario"
+
+# Valores finales que se van a usar en la instalacion
+INSTALL_EFI_SIZE=""
+INSTALL_SYSTEM_SIZE=""
+INSTALL_SWAP_SIZE=""
+INSTALL_CREATE_BACKUP="S"
+INSTALL_LOCALE=""
+INSTALL_KEYBOARD=""
+INSTALL_TIMEZONE=""
+HOSTNAME_VALUE=""
+USERNAME=""
+USER_PASSWORD=""
+APT_ENABLE_NONFREE="S"
+APT_ENABLE_SECURITY="S"
+APT_ENABLE_UPDATES="S"
+APT_ENABLE_DEBSRC="N"
+APT_PROXY=""
+INSTALL_NONFREE_FIRMWARE="S"
+ENABLE_POPCON="N"
+SOFTWARE_INSTALL_MODE="POSTBOOT"
+INSTALL_SSH_IN_BASE="S"
+INSTALL_TASKSEL_NOW="N"
+
+# ============================================
+# LOG Y MENSAJES
+# ============================================
+
+install_step() {
+    local msg="[install][step] $*"
+    printf "\n%s\n" "$msg" | tee -a "$LOG_FILE"
+}
+
+install_ok() {
+    local msg="[install][ok] $*"
+    printf "%s\n" "$msg" | tee -a "$LOG_FILE"
+}
+
+install_warn() {
+    local msg="[install][warn] $*"
+    printf "%s\n" "$msg" | tee -a "$LOG_FILE"
+}
+
+install_fail() {
+    local msg="[install][error] $*"
+    printf "%s\n" "$msg" | tee -a "$LOG_FILE" >&2
+    exit 1
+}
+
+install_info() {
+    local msg="[install][info] $*"
+    printf "%s\n" "$msg" | tee -a "$LOG_FILE"
+}
+
+install_have_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# ============================================
+# UTILIDADES
+# ============================================
+
+install_install_normalize_size_gib() {
+    local raw="$1"
+    raw="${raw// /}"
+    raw="${raw^^}"
+    [[ -z "$raw" ]] && raw="1G"
+    if [[ "$raw" =~ ^[0-9]+$ ]]; then
+        raw="${raw}G"
+    fi
+    printf '%s\n' "$raw"
+}
+
+install_install_size_gib_to_int() {
+    local raw="$1"
+    raw="$(normalize_size_gib "$raw")"
+    if [[ "$raw" =~ ^[0-9]+G$ ]]; then
+        printf '%s\n' "${raw%G}"
+        return 0
+    fi
+    printf '0\n'
+}
+
+normalize_yes_no() {
+    local input="${1:-}"
+    input="${input^^}"
+    case "$input" in
+        S|SI|Y|YES) echo "S" ;;
+        N|NO)       echo "N" ;;
+        *)          echo ""  ;;
+    esac
+}
+
+# ============================================
+# LIMPIEZA
+# ============================================
+
+cleanup_mounts() {
+    if [[ "$MOUNTED_CHROOT_BIND" == "true" ]]; then
+        umount -R /mnt/proc &>/dev/null || true
+        umount -R /mnt/sys  &>/dev/null || true
+        umount -R /mnt/dev  &>/dev/null || true
+        umount -R /mnt/run  &>/dev/null || true
+        MOUNTED_CHROOT_BIND="false"
+    fi
+
+    if [[ "$MOUNTED_TARGET" == "true" ]]; then
+        umount -R /mnt &>/dev/null || true
+        MOUNTED_TARGET="false"
+    fi
+}
+
+handle_error() {
+    local line="$1"
+    printf "\n[install][error] Error inesperado en linea %s. Log: %s\n" "$line" "$LOG_FILE" | tee -a "$LOG_FILE" >&2
+    cleanup_mounts
+}
+
+unmount_disk_partitions() {
+    [[ -z "$INSTALL_DISK" ]] && return 0
+
+    while IFS= read -r part; do
+        [[ -z "$part" ]] && continue
+        swapoff "$part" &>/dev/null || true
+        umount  "$part" &>/dev/null || true
+    done < <(lsblk -ln -o NAME,TYPE "$INSTALL_DISK" 2>/dev/null | awk '$2=="part"{print "/dev/"$1}')
+
+    command -v udevadm &>/dev/null && udevadm settle || true
+    return 0
+}
+
+ensure_partition_unmounted() {
+    local part="$1"
+    local tries=0
+
+    while [[ $tries -lt 5 ]]; do
+        if ! findmnt -rn -S "$part" &>/dev/null; then
+            return 0
+        fi
+        while IFS= read -r mnt; do
+            [[ -z "$mnt" ]] && continue
+            umount "$mnt" &>/dev/null || umount -l "$mnt" &>/dev/null || true
+        done < <(findmnt -rn -S "$part" -o TARGET)
+        command -v udevadm &>/dev/null && udevadm settle || true
+        sleep 1
+        tries=$((tries + 1))
+    done
+
+    fail "No se pudo desmontar $part. Cierra el explorador de archivos del Live e intenta de nuevo."
+}
+
+trap 'handle_error $LINENO' ERR
+trap cleanup_mounts EXIT
+
+# ============================================
+# 1 - VALIDACIONES
+# ============================================
+
+check_requirements() {
+    step "1/15 - Verificando requisitos"
+
+    if [[ $EUID -ne 0 ]]; then
+        fail "Este script debe ejecutarse como root (sudo)"
+    fi
+    ok "ejecutando como root"
+
+    if [[ ! -d /sys/firmware/efi ]]; then
+        fail "Entorno no UEFI detectado. Este instalador solo soporta UEFI."
+    fi
+    ok "UEFI detectado"
+
+    if ! ping -c 1 deb.debian.org &>/dev/null; then
+        fail "Sin conexion a internet. Verifica la red (Ethernet requerido)."
+    fi
+    ok "conectividad a deb.debian.org OK"
+
+    local tools_needed=false
+    for tool in debootstrap gdisk mkfs.btrfs mkfs.fat lsblk blkid sgdisk partprobe; do
+        if ! have_cmd "$tool"; then
+            tools_needed=true
+            break
+        fi
+    done
+
+    if [[ "$tools_needed" == true ]]; then
+        info "instalando herramientas necesarias..."
+        apt-get update &>/dev/null
+        apt-get install -y debootstrap gdisk btrfs-progs dosfstools util-linux &>/dev/null
+    fi
+    ok "herramientas verificadas"
+}
+
+# ============================================
+# 2 - CALCULAR SUGERENCIAS
+# ============================================
+
+calculate_suggestions() {
+    step "2/15 - Calculando sugerencias"
+
+    DISK_SIZE_GB="$(lsblk -bdn -o SIZE "$INSTALL_DISK" 2>/dev/null | awk '{print int($1/1024/1024/1024)}')"
+    RAM_GB="$(free -m 2>/dev/null | awk '/^Mem:/{print int($2/1024)}')"
+    [[ -z "$INSTALL_RAM_GB" ]] && RAM_GB=0
+
+    if [[ $INSTALL_DISK_SIZE_GB -lt 128 ]]; then
+        SUGGESTED_SYSTEM_PCT=90
+    elif [[ $INSTALL_DISK_SIZE_GB -lt 256 ]]; then
+        SUGGESTED_SYSTEM_PCT=85
+    else
+        SUGGESTED_SYSTEM_PCT=80
+    fi
+
+    SUGGESTED_SYSTEM_GB=$((DISK_SIZE_GB * SUGGESTED_SYSTEM_PCT / 100))
+    SUGGESTED_BACKUP_GB=$((DISK_SIZE_GB - SUGGESTED_SYSTEM_GB - 1))
+    (( SUGGESTED_BACKUP_GB <= 0 )) && SUGGESTED_BACKUP_GB=0
+
+    if [[ $INSTALL_RAM_GB -le 2 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM"
+    elif [[ $INSTALL_RAM_GB -le 8 ]]; then
+        SUGGESTED_SWAP="$((RAM_GB * 2))G"
+        SWAP_REASON="2x RAM"
+    elif [[ $INSTALL_RAM_GB -le 16 ]]; then
+        SUGGESTED_SWAP="${RAM_GB}G"
+        SWAP_REASON="igual a RAM"
+    else
+        SUGGESTED_SWAP="8G"
+        SWAP_REASON="8GB fijo"
+    fi
+
+    if grep -qiE 'laptop|notebook' /sys/class/dmi/id/product_name 2>/dev/null; then
+        SUGGESTED_HOSTNAME="debian-laptop"
+    else
+        SUGGESTED_HOSTNAME="debian-pc"
+    fi
+
+    ok "sugerencias calculadas (disco: ${DISK_SIZE_GB}GB, RAM: ${RAM_GB}GB)"
+}
+
+# ============================================
+# 3 - SELECCION DE DISCO (interactivo en terminal)
+# ============================================
+
+select_disk() {
+    step "3/15 - Seleccion de disco"
+
+    local disks=()
+    local disk_info=()
+    local live_root_src live_root_disk
+
+    live_root_src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+    live_root_disk="$(lsblk -ndo PKNAME "$live_root_src" 2>/dev/null || true)"
+
+    while IFS= read -r line; do
+        local dname dsize dmodel dtype drm
+        dname="$(echo "$line" | awk '{print $1}')"
+        dsize="$(lsblk -ndo SIZE "/dev/$dname" 2>/dev/null | xargs)"
+        dmodel="$(lsblk -ndo MODEL "/dev/$dname" 2>/dev/null | xargs)"
+        dtype="$(lsblk -ndo TYPE "/dev/$dname" 2>/dev/null)"
+        if [[ "$dtype" == "disk" ]]; then
+            disks+=("/dev/$dname")
+            disk_info+=("$dsize $dmodel")
+        fi
+    done < <(lsblk -ndpo NAME | sed 's|/dev/||')
+
+    if [[ ${#disks[@]} -eq 0 ]]; then
+        fail "No se detectaron discos"
+    fi
+
+    printf "\n[install] DISCOS DISPONIBLES:\n\n" > /dev/tty
+    for i in "${!disks[@]}"; do
+        local idx=$((i + 1))
+        printf "  [%s] %s  (%s)\n" "$idx" "${disks[$i]}" "${disk_info[$i]}" > /dev/tty
+        if [[ -n "$live_root_disk" ]] && [[ "${disks[$i]}" == "/dev/$live_root_disk" ]]; then
+            printf "       ⚠  Puede ser el disco live actual\n" > /dev/tty
+        fi
+        if lsblk -n "${disks[$i]}" 2>/dev/null | grep -q part; then
+            printf "       ⚠  Contiene particiones existentes\n" > /dev/tty
+            lsblk -ln -o NAME,SIZE,FSTYPE,LABEL "${disks[$i]}" 2>/dev/null \
+                | awk 'NR>1{printf "       %s %s %s %s\n",$1,$2,$3,$4}' > /dev/tty || true
+        fi
+    done
+    printf "\n" > /dev/tty
+
+    local selection candidate
+    while true; do
+        read -r -p "[install] Selecciona disco [1-${#disks[@]}]: " selection < /dev/tty
+        selection="${selection:-1}"
+        if [[ "$selection" =~ ^[0-9]+$ ]] && \
+           (( selection >= 1 )) && (( selection <= ${#disks[@]} )); then
+            candidate="${disks[$((selection - 1))]}"
+            if lsblk -n "$candidate" 2>/dev/null | grep -q part; then
+                printf "\n[install][warn] El disco %s contiene particiones. SERAN ELIMINADAS.\n" "$candidate" > /dev/tty
+                local wipe_confirm
+                read -r -p "[install] Continuar (S/N) [N]: " wipe_confirm < /dev/tty
+                wipe_confirm="$(normalize_yes_no "${wipe_confirm:-N}")"
+                if [[ "$wipe_confirm" != "S" ]]; then
+                    printf "[install] Escoge otro disco.\n" > /dev/tty
+                    continue
+                fi
+            fi
+            DISK="$candidate"
+            break
+        fi
+        printf "[install] Seleccion invalida.\n" > /dev/tty
+    done
+
+    ok "disco seleccionado: $INSTALL_DISK"
+}
+
+# ============================================
+# 4 - PEDIR PASSWORD (interactivo en terminal)
+# ============================================
+
+ask_password() {
+    step "4/15 - Definir password de usuario"
+
+    local pw1 pw2
+    printf "\n[install] Ingresa password para el usuario '%s':\n" "$USERNAME" > /dev/tty
+    while true; do
+        read -r -s -p "[install] Password: " pw1 < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ -z "$pw1" ]]; then
+            printf "[install][warn] La password no puede estar vacia.\n" > /dev/tty
+            continue
+        fi
+        read -r -s -p "[install] Repite password: " pw2 < /dev/tty
+        printf "\n" > /dev/tty
+        if [[ "$pw1" == "$pw2" ]]; then
+            USER_PASSWORD="$pw1"
+            break
+        fi
+        printf "[install][warn] Las passwords no coinciden, intenta de nuevo.\n" > /dev/tty
+    done
+    ok "password de usuario definida"
+}
+
+# ============================================
+# 5 - RESUMEN PRE-INSTALACION
+# ============================================
+
+print_install_summary() {
+    step "5/15 - Resumen de instalacion"
+
+    local system_num backup_calc
+    system_num="$(echo "$INSTALL_SYSTEM_SIZE" | sed 's/[^0-9]//g')"
+    backup_calc=$((DISK_SIZE_GB - system_num - 1))
+
+    printf "\n[install] === RESUMEN ===\n\n"
+    printf "[install] disco    --> %s (%sGB)\n" "$INSTALL_DISK" "$INSTALL_DISK_SIZE_GB"
+    printf "\n[install] PARTICIONES:\n"
+    printf "[install]   EFI    --> %s   FAT32   /boot/efi\n" "$INSTALL_EFI_SIZE"
+    printf "[install]   SISTEMA--> %s   BTRFS   /\n" "$INSTALL_SYSTEM_SIZE"
+    if [[ "$INSTALL_CREATE_BACKUP" == "S" ]]; then
+        printf "[install]   BACKUP --> %sG   BTRFS   (desmontada)\n" "$backup_calc"
+    else
+        printf "[install]   BACKUP --> no crear\n"
+    fi
+    printf "[install]   SWAP   --> %s   (swapfile en @swap)\n" "$INSTALL_SWAP_SIZE"
+    printf "\n[install] SUBVOLUMENES:\n"
+    printf "[install]   @ @home @snapshots @cache @log @tmp @swap\n"
+    printf "\n[install] SISTEMA:\n"
+    printf "[install]   Debian:   %s\n" "$DEBIAN_RELEASE"
+    printf "[install]   Hostname: %s\n" "$HOSTNAME_VALUE"
+    printf "[install]   Usuario:  %s (sudo, root bloqueado)\n" "$USERNAME"
+    printf "[install]   Locale:   %s\n" "$LOCALE"
+    printf "[install]   Timezone: %s\n" "$TIMEZONE"
+    printf "[install]   Teclado:  %s\n" "$KEYBOARD"
+    printf "\n[install] SOFTWARE:\n"
+    printf "[install]   Modo:     %s\n" "$SOFTWARE_INSTALL_MODE"
+    printf "[install]   SSH base: %s\n" "$INSTALL_SSH_IN_BASE"
+    printf "[install]   non-free: %s  security: %s  updates: %s\n" \
+        "$APT_ENABLE_NONFREE" "$APT_ENABLE_SECURITY" "$APT_ENABLE_UPDATES"
+    printf "\n[install][warn] TODOS LOS DATOS EN %s SERAN ELIMINADOS.\n\n" "$INSTALL_DISK"
+
+    local confirm
+    read -r -p "[install] Escribe exactamente '$INSTALL_DISK' para confirmar: " confirm < /dev/tty
+    if [[ "$confirm" != "$INSTALL_DISK" ]]; then
+        fail "Confirmacion incorrecta. Instalacion cancelada."
+    fi
+    ok "confirmacion aceptada"
+}
+
+# ============================================
+# 6 - PARTICIONADO
+# ============================================
+
+partition_disk() {
+    step "6/15 - Particionando $INSTALL_DISK"
+
+    unmount_disk_partitions
+
+    local P=""
+    [[ "$INSTALL_DISK" =~ nvme ]] && P="p"
+
+    EFI_PART="${DISK}${P}1"
+    SYSTEM_PART="${DISK}${P}2"
+    BACKUP_PART="${DISK}${P}3"
+
+    sgdisk -Z "$INSTALL_DISK" &>/dev/null || true
+    sgdisk -og "$INSTALL_DISK" || fail "Error creando GPT"
+    sgdisk -n "1::+${EFI_SIZE}"    -t 1:ef00 -c 1:"EFI"     "$INSTALL_DISK" || fail "Error particion EFI"
+    sgdisk -n "2::+${SYSTEM_SIZE}" -t 2:8300 -c 2:"SISTEMA"  "$INSTALL_DISK" || fail "Error particion Sistema"
+
+    if [[ "$INSTALL_CREATE_BACKUP" == "S" ]]; then
+        sgdisk -n 3:: -t 3:8300 -c 3:"BACKUP" "$INSTALL_DISK" || fail "Error particion Backup"
+    fi
+
+    partprobe "$INSTALL_DISK" &>/dev/null || true
+    sleep 2
+    ok "disco particionado"
+}
+
+# ============================================
+# 7 - FORMATEO
+# ============================================
+
+format_partitions() {
+    step "7/15 - Formateando particiones"
+
+    unmount_disk_partitions
+    ensure_partition_unmounted "$INSTALL_EFI_PART"
+    ensure_partition_unmounted "$INSTALL_SYSTEM_PART"
+    [[ "$INSTALL_CREATE_BACKUP" == "S" ]] && ensure_partition_unmounted "$INSTALL_BACKUP_PART"
+
+    mkfs.fat -F32 -n EFI    "$INSTALL_EFI_PART"    || fail "Error formateando EFI"
+    mkfs.btrfs -f -L DEBIAN "$INSTALL_SYSTEM_PART" || fail "Error formateando Sistema"
+
+    if [[ "$INSTALL_CREATE_BACKUP" == "S" ]]; then
+        mkfs.btrfs -f -L BACKUP "$INSTALL_BACKUP_PART" || fail "Error formateando Backup"
+        BACKUP_UUID="$(blkid -s UUID -o value "$INSTALL_BACKUP_PART")"
+    fi
+
+    EFI_UUID="$(blkid -s UUID -o value "$INSTALL_EFI_PART")"
+    SYSTEM_UUID="$(blkid -s UUID -o value "$INSTALL_SYSTEM_PART")"
+    ok "particiones formateadas"
+}
+
+# ============================================
+# 8 - SUBVOLUMENES BTRFS
+# ============================================
+
+create_subvolumes() {
+    step "8/15 - Creando subvolumenes btrfs"
+
+    mount "$INSTALL_SYSTEM_PART" /mnt || fail "Error montando sistema"
+
+    btrfs subvolume create /mnt/@          || fail "Error creando @"
+    btrfs subvolume create /mnt/@home
+    btrfs subvolume create /mnt/@snapshots
+    btrfs subvolume create /mnt/@cache
+    btrfs subvolume create /mnt/@log
+    btrfs subvolume create /mnt/@tmp
+    btrfs subvolume create /mnt/@swap
+
+    umount /mnt
+    ok "subvolumenes creados"
+}
+
+create_mount_structure() {
+    step "8b/15 - Montando estructura"
+
+    mount -o "$BTRFS_OPTS,subvol=@" "$INSTALL_SYSTEM_PART" /mnt
+
+    mkdir -p /mnt/{home,boot/efi,.snapshots,var/{cache,log,tmp,swap}}
+
+    mount -o "$BTRFS_OPTS,subvol=@home"      "$INSTALL_SYSTEM_PART" /mnt/home
+    mount -o "$BTRFS_OPTS,subvol=@snapshots" "$INSTALL_SYSTEM_PART" /mnt/.snapshots
+    mount -o "$BTRFS_OPTS,subvol=@cache"     "$INSTALL_SYSTEM_PART" /mnt/var/cache
+    mount -o "$BTRFS_OPTS,subvol=@log"       "$INSTALL_SYSTEM_PART" /mnt/var/log
+    mount -o "$BTRFS_OPTS,subvol=@tmp"       "$INSTALL_SYSTEM_PART" /mnt/var/tmp
+    mount -o "defaults,noatime,subvol=@swap" "$INSTALL_SYSTEM_PART" /mnt/var/swap
+
+    mount "$INSTALL_EFI_PART" /mnt/boot/efi
+    MOUNTED_TARGET="true"
+    ok "estructura montada"
+}
+
+# ============================================
+# 9 - SISTEMA BASE (debootstrap)
+# ============================================
+
+install_base() {
+    step "9/15 - Instalando sistema base con debootstrap (varios minutos)"
+
+    debootstrap --arch=amd64 "$DEBIAN_RELEASE" /mnt "$DEBIAN_MIRROR" \
+        || fail "Error en debootstrap"
+    ok "sistema base instalado"
+}
+
+# ============================================
+# 10 - CONFIGURACION (fstab + sistema + APT)
+# ============================================
+
+configure_fstab() {
+    step "10/15 - Generando fstab"
+
+    cat > /mnt/etc/fstab << EOF
+# /etc/fstab - generado por install.sh (v008)
+UUID=$SYSTEM_UUID  /              btrfs  $BTRFS_OPTS,subvol=@           0 0
+UUID=$SYSTEM_UUID  /home          btrfs  $BTRFS_OPTS,subvol=@home       0 0
+UUID=$SYSTEM_UUID  /.snapshots    btrfs  $BTRFS_OPTS,subvol=@snapshots  0 0
+UUID=$SYSTEM_UUID  /var/cache     btrfs  $BTRFS_OPTS,subvol=@cache      0 0
+UUID=$SYSTEM_UUID  /var/log       btrfs  $BTRFS_OPTS,subvol=@log        0 0
+UUID=$SYSTEM_UUID  /var/tmp       btrfs  $BTRFS_OPTS,subvol=@tmp        0 0
+UUID=$SYSTEM_UUID  /var/swap      btrfs  defaults,noatime,subvol=@swap  0 0
+UUID=$EFI_UUID     /boot/efi      vfat   defaults,noatime               0 2
+EOF
+
+    if [[ "$INSTALL_CREATE_BACKUP" == "S" ]]; then
+        echo "# UUID=$BACKUP_UUID  /mnt/backup  btrfs  defaults,noatime  0 0" >> /mnt/etc/fstab
+    fi
+
+    ok "fstab generado"
+}
+
+configure_system() {
+    step "10b/15 - Configurando hostname, timezone y locale"
+
+    echo "$HOSTNAME_VALUE" > /mnt/etc/hostname
+
+    cat > /mnt/etc/hosts << EOF
+127.0.0.1   localhost
+127.0.1.1   $HOSTNAME_VALUE
+
+::1         localhost ip6-localhost ip6-loopback
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+EOF
+
+    ln -sf "/usr/share/zoneinfo/$TIMEZONE" /mnt/etc/localtime
+
+    echo "$LOCALE UTF-8"   >> /mnt/etc/locale.gen
+    echo "en_US.UTF-8 UTF-8" >> /mnt/etc/locale.gen
+
+    # Teclado
+    mkdir -p /mnt/etc/default
+    cat > /mnt/etc/default/keyboard << EOF
+XKBMODEL="pc105"
+XKBLAYOUT="$KEYBOARD"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+
+    ok "hostname, timezone, locale y teclado configurados"
+}
+
+configure_apt_sources() {
+    step "10c/15 - Configurando repositorios APT"
+
+    local components="main"
+    if [[ "$APT_ENABLE_NONFREE" == "S" ]]; then
+        components="main contrib non-free non-free-firmware"
+    fi
+
+    : > /mnt/etc/apt/sources.list
+
+    echo "deb $DEBIAN_MIRROR $DEBIAN_RELEASE $components" >> /mnt/etc/apt/sources.list
+    if [[ "$APT_ENABLE_DEBSRC" == "S" ]]; then
+        echo "deb-src $DEBIAN_MIRROR $DEBIAN_RELEASE $components" >> /mnt/etc/apt/sources.list
+    fi
+
+    if [[ "$APT_ENABLE_SECURITY" == "S" ]]; then
+        printf "\ndeb http://deb.debian.org/debian-security %s-security %s\n" \
+            "$DEBIAN_RELEASE" "$components" >> /mnt/etc/apt/sources.list
+        if [[ "$APT_ENABLE_DEBSRC" == "S" ]]; then
+            printf "deb-src http://deb.debian.org/debian-security %s-security %s\n" \
+                "$DEBIAN_RELEASE" "$components" >> /mnt/etc/apt/sources.list
+        fi
+    fi
+
+    if [[ "$APT_ENABLE_UPDATES" == "S" ]]; then
+        printf "\ndeb %s %s-updates %s\n" \
+            "$DEBIAN_MIRROR" "$DEBIAN_RELEASE" "$components" >> /mnt/etc/apt/sources.list
+        if [[ "$APT_ENABLE_DEBSRC" == "S" ]]; then
+            printf "deb-src %s %s-updates %s\n" \
+                "$DEBIAN_MIRROR" "$DEBIAN_RELEASE" "$components" >> /mnt/etc/apt/sources.list
+        fi
+    fi
+
+    if [[ -n "$APT_PROXY" ]]; then
+        mkdir -p /mnt/etc/apt/apt.conf.d
+        cat > /mnt/etc/apt/apt.conf.d/90proxy << EOF
+Acquire::http::Proxy "$APT_PROXY";
+Acquire::https::Proxy "$APT_PROXY";
+EOF
+    fi
+
+    ok "repositorios configurados"
+}
+
+# ============================================
+# 11 - USUARIO
+# ============================================
+
+create_user() {
+    step "11/15 - Creando usuario y configurando locales"
+
+    mount -t proc   /proc         /mnt/proc
+    mount -t sysfs  /sys          /mnt/sys
+    mount --rbind   /dev          /mnt/dev
+    mount --rbind   /run          /mnt/run
+    mkdir -p /mnt/dev/pts
+    mount -t devpts devpts /mnt/dev/pts &>/dev/null || true
+    MOUNTED_CHROOT_BIND="true"
+
+    cp /etc/resolv.conf /mnt/etc/
+
+    chroot /mnt apt-get update
+    chroot /mnt apt-get install -y locales sudo
+
+    chroot /mnt locale-gen
+
+    if [[ "$ENABLE_POPCON" == "S" ]]; then
+        chroot /mnt apt-get install -y popularity-contest || true
+    fi
+
+    chroot /mnt useradd -m -s /bin/bash -G sudo "$USERNAME"
+    printf '%s:%s\n' "$USERNAME" "$USER_PASSWORD" | chroot /mnt chpasswd
+    chroot /mnt passwd -l root
+
+    ok "usuario $USERNAME creado (root bloqueado)"
+}
+
+# ============================================
+# 12 - KERNEL, GRUB y GRUB-BTRFS
+# ============================================
+
+install_kernel_grub() {
+    step "12/15 - Instalando kernel, GRUB y grub-btrfs"
+
+    chroot /mnt apt-get update
+    chroot /mnt apt-get install -y linux-image-amd64 linux-headers-amd64
+
+    if [[ "$INSTALL_NONFREE_FIRMWARE" == "S" ]]; then
+        chroot /mnt apt-get install -y firmware-linux firmware-linux-nonfree || true
+    fi
+
+    chroot /mnt apt-get install -y grub-efi-amd64 efibootmgr
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=DEBIAN --no-nvram
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=DEBIAN --removable
+
+    chroot /mnt apt-get install -y btrfs-progs
+
+    # grub-btrfs: intentar desde repos, fallback a GitHub
+    if chroot /mnt apt-cache show grub-btrfs &>/dev/null; then
+        chroot /mnt apt-get install -y grub-btrfs
+        GRUB_BTRFS_INSTALLED="S"
+    else
+        warn "grub-btrfs no disponible en repos; intentando desde GitHub"
+        chroot /mnt apt-get install -y git make
+        if chroot /mnt bash -lc 'set -e
+            tmpdir=$(mktemp -d)
+            cd "$tmpdir"
+            git clone https://github.com/Antynea/grub-btrfs.git
+            cd grub-btrfs
+            make install
+            cd /
+            rm -rf "$tmpdir"'; then
+            GRUB_BTRFS_INSTALLED="S"
+        else
+            warn "No se pudo instalar grub-btrfs desde GitHub"
+            GRUB_BTRFS_INSTALLED="N"
+        fi
+    fi
+
+    if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
+        mkdir -p /mnt/etc/default/grub-btrfs
+        cat > /mnt/etc/default/grub-btrfs/config << 'EOF'
+GRUB_BTRFS_SUBMENUNAME="Debian Snapshots"
+GRUB_BTRFS_LIMIT="10"
+GRUB_BTRFS_SHOW_SNAPSHOTS_FOUND="true"
+GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS=""
+GRUB_BTRFS_IGNORE_SPECIFIC_PATH=("@")
+EOF
+        chroot /mnt systemctl enable grub-btrfsd.service || true
+        ok "grub-btrfs instalado y configurado"
+    else
+        warn "grub-btrfs no instalado; el submenu de snapshots no estara disponible"
+    fi
+
+    chroot /mnt update-grub
+    ok "kernel y GRUB instalados"
+}
+
+# ============================================
+# 13 - SOFTWARE BASE
+# ============================================
+
+install_software() {
+    step "13/15 - Instalando software base (modo: $SOFTWARE_INSTALL_MODE)"
+
+    case "$SOFTWARE_INSTALL_MODE" in
+        AUTO)
+            if [[ "$INSTALL_TASKSEL_NOW" == "S" ]]; then
+                chroot /mnt apt-get install -y tasksel
+            fi
+            chroot /mnt apt-get install -y tasksel
+            if ! chroot /mnt tasksel install standard; then
+                warn "tasksel no pudo completar; fallback con apt"
+                chroot /mnt apt-get install -y task-standard
+            fi
+            if [[ "$INSTALL_SSH_IN_BASE" == "S" ]]; then
+                chroot /mnt apt-get install -y openssh-server
+            fi
+            ;;
+        INTERACTIVE)
+            chroot /mnt apt-get install -y tasksel
+            chroot /mnt tasksel --new-install
+            if [[ "$INSTALL_SSH_IN_BASE" == "S" ]] && \
+               ! chroot /mnt dpkg -l 2>/dev/null | grep -q "^ii.*openssh-server"; then
+                chroot /mnt apt-get install -y openssh-server
+            fi
+            ;;
+        POSTBOOT)
+            if [[ "$INSTALL_TASKSEL_NOW" == "S" ]]; then
+                chroot /mnt apt-get install -y tasksel
+            fi
+            if [[ "$INSTALL_SSH_IN_BASE" == "S" ]]; then
+                chroot /mnt apt-get install -y openssh-server
+            fi
+            ;;
+        *)
+            warn "modo de software desconocido, no se instalan tareas adicionales"
+            ;;
+    esac
+
+    if chroot /mnt dpkg -l 2>/dev/null | grep -q "^ii.*openssh-server"; then
+        mkdir -p /mnt/etc/ssh/sshd_config.d
+        cat > /mnt/etc/ssh/sshd_config.d/security.conf << 'EOF'
+PermitRootLogin no
+MaxAuthTries 3
+EOF
+        ok "SSH instalado y configurado (PermitRootLogin no)"
+    fi
+
+    ok "software base instalado"
+}
+
+# ============================================
+# 14 - RED y SWAPFILE
+# ============================================
+
+configure_network() {
+    step "14/15 - Configurando red (DHCP via systemd-networkd)"
+
+    mkdir -p /mnt/etc/systemd/network
+    cat > /mnt/etc/systemd/network/20-wired.network << 'EOF'
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
+EOF
+
+    chroot /mnt systemctl enable systemd-networkd
+
+    chroot /mnt apt-get install -y systemd-resolved &>/dev/null || true
+    if chroot /mnt systemctl list-unit-files 2>/dev/null | grep -q '^systemd-resolved\.service'; then
+        chroot /mnt systemctl enable systemd-resolved
+        ln -sf /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
+    else
+        warn "systemd-resolved no disponible; se deja resolv.conf estatico"
+        cat > /mnt/etc/resolv.conf << 'EOF'
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+    fi
+
+    ok "red configurada"
+}
+
+create_swapfile() {
+    step "14b/15 - Creando swapfile ($INSTALL_SWAP_SIZE)"
+
+    local swap_gb="${SWAP_SIZE%G}"
+    local swap_mb=$((swap_gb * 1024))
+
+    chroot /mnt truncate -s 0 /var/swap/swapfile
+    chroot /mnt chattr +C /var/swap/swapfile
+    chroot /mnt dd if=/dev/zero of=/var/swap/swapfile bs=1M count="$swap_mb" status=progress
+    chroot /mnt chmod 600 /var/swap/swapfile
+    chroot /mnt mkswap /var/swap/swapfile
+
+    echo "/var/swap/swapfile none swap defaults 0 0" >> /mnt/etc/fstab
+
+    ok "swapfile creado"
+}
+
+# ============================================
+# 15 - RESUMEN FINAL
+# ============================================
+
+final_cleanup() {
+    chroot /mnt update-grub &>/dev/null || true
+    cleanup_mounts
+}
+
+show_final_summary() {
+    step "15/15 - Instalacion completada"
+
+    printf "\n[install] ============================================\n"
+    printf "[install] DEBIAN %s INSTALADO CORRECTAMENTE\n" "$DEBIAN_RELEASE"
+    printf "[install] ============================================\n\n"
+
+    printf "[install] disco    : %s\n" "$INSTALL_DISK"
+    printf "[install] hostname : %s\n" "$HOSTNAME_VALUE"
+    printf "[install] usuario  : %s (sudo, root bloqueado)\n" "$USERNAME"
+    printf "[install] locale   : %s\n" "$LOCALE"
+    printf "[install] timezone : %s\n" "$TIMEZONE"
+    printf "[install] teclado  : %s\n" "$KEYBOARD"
+    if [[ "$GRUB_BTRFS_INSTALLED" == "S" ]]; then
+        printf "[install] grub-btrfs: instalado y habilitado\n"
+    else
+        printf "[install] grub-btrfs: NO instalado\n"
+    fi
+    if chroot /mnt dpkg -l 2>/dev/null | grep -q "^ii.*openssh-server"; then
+        printf "[install] SSH     : instalado - ssh %s@<IP>\n" "$USERNAME"
+    fi
+
+    if [[ "$INSTALL_CREATE_BACKUP" == "S" ]]; then
+        printf "\n[install] UUID particion backup:\n[install]   %s\n" "$BACKUP_UUID"
+        printf "[install] (usar en /etc/btrbk/btrbk.conf)\n"
+    fi
+
+    printf "\n[install] SUBVOLUMENES:\n"
+    printf "[install]   @ -> /  |  @home -> /home  |  @snapshots -> /.snapshots\n"
+    printf "[install]   @cache @log @tmp @swap\n"
+
+    printf "\n[install] PROXIMOS PASOS:\n"
+    printf "[install]   1) sudo apt install snapper\n"
+    printf "[install]      sudo snapper -c root create-config /\n"
+    printf "[install]      sudo btrfs subvolume delete /.snapshots\n"
+    printf "[install]      sudo mkdir /.snapshots && sudo mount -a\n"
+    printf "[install]   2) sudo apt install btrbk\n"
+    printf "[install]      sudo nano /etc/btrbk/btrbk.conf\n"
+    printf "\n[install] log completo: %s\n" "$LOG_FILE"
+    printf "\n"
+}
+
+# ============================================
+# MAIN
+# ============================================
 main() {
     ensure_tty
     init_palette
