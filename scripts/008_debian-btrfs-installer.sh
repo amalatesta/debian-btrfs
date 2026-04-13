@@ -1104,8 +1104,29 @@ ask_disk_password_in_plain_terminal() {
         printf "[install] Seleccion invalida.\n" > /dev/tty
     done
 
-    printf "\n[install] === PASSWORD DE USUARIO ===\n" > /dev/tty
-    printf "[install] Usuario : %s\n\n" "$DRYRUN_SELECTED_USERNAME" > /dev/tty
+    printf "\n[install] === USUARIO Y PASSWORD ===\n" > /dev/tty
+
+    local username_value input_username
+    username_value="${DRYRUN_SELECTED_USERNAME:-usuario}"
+    while true; do
+        read -r -p "[install] Nombre de usuario [${username_value}] : " input_username < /dev/tty
+        input_username="${input_username:-$username_value}"
+
+        if [[ "$input_username" == "root" ]]; then
+            printf "[install][warn] No se permite usar 'root' como usuario principal.\n" > /dev/tty
+            continue
+        fi
+
+        if [[ ! "$input_username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+            printf "[install][warn] Usuario invalido. Usa minusculas, numeros, '_' o '-'.\n" > /dev/tty
+            continue
+        fi
+
+        DRYRUN_SELECTED_USERNAME="$input_username"
+        break
+    done
+
+    printf "[install] Usuario elegido: %s\n\n" "$DRYRUN_SELECTED_USERNAME" > /dev/tty
 
     local pw1 pw2
     while true; do
