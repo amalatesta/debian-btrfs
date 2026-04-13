@@ -41,13 +41,13 @@ ui_init_theme() {
 
 ui_setup_terminal() {
    stty -echo -icanon min 1 time 0
-   tput civis
+   tput civis > /dev/tty 2>/dev/null || true
 }
 
 ui_restore_terminal() {
    stty sane 2>/dev/null || true
-   tput sgr0 2>/dev/null || true
-   tput cnorm 2>/dev/null || true
+   tput sgr0 > /dev/tty 2>/dev/null || true
+   tput cnorm > /dev/tty 2>/dev/null || true
 }
 
 ui_cleanup() {
@@ -315,7 +315,10 @@ ui_show_text_box() {
 ui_show_message() {
    local title="$1"
    local message="$2"
-   local lines=("$message")
+   local rendered_message=""
+   local lines=()
+   printf -v rendered_message '%b' "$message"
+   mapfile -t lines <<< "$rendered_message"
    ui_show_text_box "$title" lines
 }
 

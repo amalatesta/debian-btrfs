@@ -76,6 +76,9 @@ compare_dirs_summary() {
    local source_dir="$1"
    local source_label="$2"
    local diff_rc
+   local diff_out diff_err
+   local diff_lines=()
+   local err_lines=()
    local exclude_args=(
       --exclude=.snapshots
       --exclude=proc
@@ -101,8 +104,18 @@ compare_dirs_summary() {
    echo "Excludes: .snapshots proc sys dev run tmp mnt media lost+found swapfile"
 
    print_section "Summary Differences"
-   diff -qr "${exclude_args[@]}" "$source_dir" / || diff_rc=$?
+   diff_out="$(mktemp)"
+   diff_err="$(mktemp)"
+   diff -qr --no-dereference "${exclude_args[@]}" "$source_dir" / >"$diff_out" 2>"$diff_err" || diff_rc=$?
    diff_rc="${diff_rc:-0}"
+
+   mapfile -t diff_lines < "$diff_out"
+   mapfile -t err_lines < "$diff_err"
+   rm -f "$diff_out" "$diff_err"
+
+   if (( ${#diff_lines[@]} > 0 )); then
+      printf '%s\n' "${diff_lines[@]}"
+   fi
 
    case "$diff_rc" in
       0)
@@ -112,12 +125,25 @@ compare_dirs_summary() {
          echo
          echo "Differences were found and listed above."
          ;;
+      2)
+         echo
+         echo "Partial comparison completed: diff found paths that could not be compared on the live system."
+         if (( ${#err_lines[@]} > 0 )); then
+            print_section "Comparison Warnings"
+            printf '%s\n' "${err_lines[@]}"
+         fi
+         ;;
       *)
          echo
          echo "diff returned unexpected code: $diff_rc"
+         if (( ${#err_lines[@]} > 0 )); then
+            printf '%s\n' "${err_lines[@]}"
+         fi
          return "$diff_rc"
          ;;
    esac
+
+   return 0
 }
 
 mount_backup_if_needed() {

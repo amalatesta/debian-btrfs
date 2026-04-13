@@ -70,7 +70,21 @@ admin_show_boot_context() {
 # Helper: obtiene el filesystem type de un dispositivo de bloque
 # Uso: fstype=$(admin_get_usb_fstype /dev/sdb1)
 admin_get_usb_fstype() {
-   blkid -s TYPE -o value "$1" 2>/dev/null
+   lsblk -no FSTYPE "$1" 2>/dev/null | head -1
+}
+
+admin_normalize_device_path() {
+   local raw_value="$1"
+   local normalized="$raw_value"
+
+   normalized="${normalized//$'\r'/}"
+   normalized="${normalized//$'\n'/}"
+   normalized="${normalized//$'\t'/}"
+   normalized="${normalized//[[:cntrl:]]/}"
+   normalized="${normalized#${normalized%%[![:space:]]*}}"
+   normalized="${normalized%${normalized##*[![:space:]]}}"
+
+   printf '%s\n' "$normalized"
 }
 
 # Helper: verifica que haya espacio libre en el USB para el golden export.
@@ -368,9 +382,15 @@ admin_usb_golden_export() {
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB a usar (ejemplo: /dev/sdb1)" "")"
+   device="$(ui_prompt_input "Particion USB a usar (ruta completa, ejemplo: /dev/sda1)" "")"
+   device="$(admin_normalize_device_path "$device")"
    if [[ -z "$device" ]]; then
       ui_show_message "USB Golden" "Operacion cancelada: falta dispositivo real."
+      return 1
+   fi
+   if [[ "$device" != /dev/* ]]; then
+      printf -v device '%q' "$device"
+      ui_show_message "USB Golden" "Ud. ingreso: $device\nDebes indicar la ruta completa del dispositivo.\nEjemplo valido: /dev/sda1"
       return 1
    fi
 
@@ -561,6 +581,7 @@ admin_compare_btrbk_current() {
    local mounted_here=0
    local backup_lines=()
    local snapshot_name
+   local selection_options=()
 
    if ! mountpoint -q /mnt/backup; then
       mount /mnt/backup
@@ -577,10 +598,26 @@ admin_compare_btrbk_current() {
       return 1
    fi
 
-   ui_show_text_box "btrbk | Snapshots" backup_lines "Elegir nombre y luego ENTER"
-   snapshot_name="$(ui_prompt_input "Nombre del snapshot de btrbk a comparar" "")"
-   if [[ -z "$snapshot_name" ]]; then
-      ui_show_message "Comparar btrbk" "Operacion cancelada: falta nombre de snapshot."
+   selection_options=("${backup_lines[@]}" "Ingresar nombre manualmente" "Cancelar")
+   ui_run_menu \
+      "btrbk | Snapshots" \
+      "Selecciona un snapshot de la lista" \
+      selection_options \
+      "Flechas: mover | ENTER: seleccionar | q/Esc: cancelar"
+
+   if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+      return 1
+   fi
+
+   if [[ "$UI_MENU_SELECTED" -lt ${#backup_lines[@]} ]]; then
+      snapshot_name="${backup_lines[$UI_MENU_SELECTED]}"
+   elif [[ "$UI_MENU_SELECTED" -eq ${#backup_lines[@]} ]]; then
+      snapshot_name="$(ui_prompt_input "Nombre del snapshot de btrbk a comparar" "")"
+      if [[ -z "$snapshot_name" ]]; then
+         ui_show_message "Comparar btrbk" "Operacion cancelada: falta nombre de snapshot."
+         return 1
+      fi
+   else
       return 1
    fi
 
@@ -592,13 +629,20 @@ admin_compare_btrbk_current() {
 admin_compare_usb_btrfs_current() {
    local lsblk_lines=()
    local device mounted_here=0 usb_lines=() snapshot_name
+   local selection_options=()
 
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB Btrfs (ejemplo: /dev/sdb1)" "")"
+   device="$(ui_prompt_input "Particion USB Btrfs (ruta completa, ejemplo: /dev/sda1)" "")"
+   device="$(admin_normalize_device_path "$device")"
    if [[ -z "$device" ]]; then
       ui_show_message "Comparar USB Btrfs" "Operacion cancelada: falta dispositivo real."
+      return 1
+   fi
+   if [[ "$device" != /dev/* ]]; then
+      printf -v device '%q' "$device"
+      ui_show_message "Comparar USB Btrfs" "Ud. ingreso: $device\nDebes indicar la ruta completa del dispositivo.\nEjemplo valido: /dev/sda1"
       return 1
    fi
    if [[ ! -b "$device" ]]; then
@@ -634,10 +678,26 @@ Esta comparacion requiere un USB formateado como Btrfs."
       return 1
    fi
 
-   ui_show_text_box "USB Btrfs | Snapshots" usb_lines "Elegir nombre y luego ENTER"
-   snapshot_name="$(ui_prompt_input "Nombre del snapshot USB a comparar" "")"
-   if [[ -z "$snapshot_name" ]]; then
-      ui_show_message "Comparar USB Btrfs" "Operacion cancelada: falta nombre de snapshot."
+   selection_options=("${usb_lines[@]}" "Ingresar nombre manualmente" "Cancelar")
+   ui_run_menu \
+      "USB Btrfs | Snapshots" \
+      "Selecciona un snapshot de la lista" \
+      selection_options \
+      "Flechas: mover | ENTER: seleccionar | q/Esc: cancelar"
+
+   if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+      return 1
+   fi
+
+   if [[ "$UI_MENU_SELECTED" -lt ${#usb_lines[@]} ]]; then
+      snapshot_name="${usb_lines[$UI_MENU_SELECTED]}"
+   elif [[ "$UI_MENU_SELECTED" -eq ${#usb_lines[@]} ]]; then
+      snapshot_name="$(ui_prompt_input "Nombre del snapshot USB a comparar" "")"
+      if [[ -z "$snapshot_name" ]]; then
+         ui_show_message "Comparar USB Btrfs" "Operacion cancelada: falta nombre de snapshot."
+         return 1
+      fi
+   else
       return 1
    fi
 
@@ -649,13 +709,20 @@ Esta comparacion requiere un USB formateado como Btrfs."
 admin_compare_usb_stream_current() {
    local lsblk_lines=()
    local device mounted_here=0 usb_lines=() stream_name
+   local selection_options=()
 
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB con streams (ejemplo: /dev/sdb1)" "")"
+   device="$(ui_prompt_input "Particion USB con streams (ruta completa, ejemplo: /dev/sda1)" "")"
+   device="$(admin_normalize_device_path "$device")"
    if [[ -z "$device" ]]; then
       ui_show_message "Comparar USB Stream" "Operacion cancelada: falta dispositivo real."
+      return 1
+   fi
+   if [[ "$device" != /dev/* ]]; then
+      printf -v device '%q' "$device"
+      ui_show_message "Comparar USB Stream" "Ud. ingreso: $device\nDebes indicar la ruta completa del dispositivo.\nEjemplo valido: /dev/sda1"
       return 1
    fi
    if [[ ! -b "$device" ]]; then
@@ -681,10 +748,26 @@ admin_compare_usb_stream_current() {
       return 1
    fi
 
-   ui_show_text_box "USB Stream | Archivos" usb_lines "Elegir nombre y luego ENTER"
-   stream_name="$(ui_prompt_input "Nombre del archivo .btrfs-stream a comparar" "")"
-   if [[ -z "$stream_name" ]]; then
-      ui_show_message "Comparar USB Stream" "Operacion cancelada: falta nombre de stream."
+   selection_options=("${usb_lines[@]}" "Ingresar nombre manualmente" "Cancelar")
+   ui_run_menu \
+      "USB Stream | Archivos" \
+      "Selecciona un archivo de la lista" \
+      selection_options \
+      "Flechas: mover | ENTER: seleccionar | q/Esc: cancelar"
+
+   if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+      return 1
+   fi
+
+   if [[ "$UI_MENU_SELECTED" -lt ${#usb_lines[@]} ]]; then
+      stream_name="${usb_lines[$UI_MENU_SELECTED]}"
+   elif [[ "$UI_MENU_SELECTED" -eq ${#usb_lines[@]} ]]; then
+      stream_name="$(ui_prompt_input "Nombre del archivo .btrfs-stream a comparar" "")"
+      if [[ -z "$stream_name" ]]; then
+         ui_show_message "Comparar USB Stream" "Operacion cancelada: falta nombre de stream."
+         return 1
+      fi
+   else
       return 1
    fi
 
