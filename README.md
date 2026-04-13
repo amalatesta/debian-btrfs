@@ -2785,7 +2785,13 @@ Esto muestra al abrir terminal (TTY o terminal del entorno gráfico) un resumen 
 **Crear script global:**
 
 ```bash
-sudo nano /usr/local/bin/show-boot-context.sh
+sudo install -Dm755 scripts/utilitarios/show-boot-context.sh /usr/local/bin/show-boot-context.sh
+```
+
+El script reutilizable queda versionado en:
+
+```bash
+scripts/utilitarios/show-boot-context.sh
 ```
 
 **Contenido:**

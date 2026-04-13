@@ -3,6 +3,11 @@
 Registro vivo del desarrollo de la interfaz bash+tput para el instalador Debian Btrfs.
 Documenta lo completado, en progreso y lo proyectado.
 
+Estructura actual:
+- `instalador/`: instaladores y pruebas de UI
+- `checklist/`: chequeos y reportes del sistema instalado
+- `utilitarios/`: utilidades reutilizables para post-instalación
+
 ---
 
 ## 📊 Estado Actual
