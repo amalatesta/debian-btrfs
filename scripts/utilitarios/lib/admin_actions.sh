@@ -6,7 +6,9 @@ ADMIN_UTIL_DIR="$(cd "${ADMIN_ACTIONS_DIR}/.." && pwd)"
 BOOT_CONTEXT_SCRIPT="${ADMIN_UTIL_DIR}/show-boot-context.sh"
 BACKUP_HEALTH_SCRIPT="${ADMIN_UTIL_DIR}/backup-health-report.sh"
 SNAPPER_RUN_SCRIPT="${ADMIN_UTIL_DIR}/snapper-run-now.sh"
+SNAPPER_CONFIG_SCRIPT="${ADMIN_UTIL_DIR}/snapper-show-config.sh"
 BTRBK_RUN_SCRIPT="${ADMIN_UTIL_DIR}/btrbk-run-now.sh"
+BTRBK_CONFIG_SCRIPT="${ADMIN_UTIL_DIR}/btrbk-show-config.sh"
 RECOVERY_SCRIPT="${ADMIN_UTIL_DIR}/recovery-partition.sh"
 USB_GOLDEN_SCRIPT="${ADMIN_UTIL_DIR}/usb-golden-snapshot.sh"
 SNAPSHOT_COMPARE_SCRIPT="${ADMIN_UTIL_DIR}/snapshot-compare.sh"
@@ -23,7 +25,7 @@ admin_require_scripts() {
    local missing=0
    local file
 
-   for file in "$BOOT_CONTEXT_SCRIPT" "$BACKUP_HEALTH_SCRIPT" "$SNAPPER_RUN_SCRIPT" "$BTRBK_RUN_SCRIPT" "$RECOVERY_SCRIPT" "$USB_GOLDEN_SCRIPT" "$SNAPSHOT_COMPARE_SCRIPT"; do
+   for file in "$BOOT_CONTEXT_SCRIPT" "$BACKUP_HEALTH_SCRIPT" "$SNAPPER_RUN_SCRIPT" "$SNAPPER_CONFIG_SCRIPT" "$BTRBK_RUN_SCRIPT" "$BTRBK_CONFIG_SCRIPT" "$RECOVERY_SCRIPT" "$USB_GOLDEN_SCRIPT" "$SNAPSHOT_COMPARE_SCRIPT"; do
       if [[ ! -x "$file" ]]; then
          echo "Falta script ejecutable: $file"
          missing=1
@@ -121,12 +123,21 @@ admin_run_snapper_now() {
    admin_run_report "Snapper - Realizar snapshot ahora" "$SNAPPER_RUN_SCRIPT"
 }
 
+admin_show_snapper_config() {
+   admin_run_report "Configuracion - Snapper" "$SNAPPER_CONFIG_SCRIPT"
+}
+
 admin_run_btrbk_now() {
    admin_run_report "Btrbk - Realizar snapshot ahora" "$BTRBK_RUN_SCRIPT"
 }
 
+admin_show_btrbk_config() {
+   admin_run_report "Configuracion - Btrbk" "$BTRBK_CONFIG_SCRIPT"
+}
+
 admin_snapper_menu() {
    local snapper_options=(
+      "Configuracion actual"
       "Listado de los ultimos snapshots realizados"
       "Realizar snapshot ahora"
       "Exportar snapshot GOLDEN a USB"
@@ -147,18 +158,20 @@ admin_snapper_menu() {
       fi
 
       case "$UI_MENU_SELECTED" in
-         0) admin_show_snapper_snapshots || true ;;
-         1) admin_run_snapper_now || true ;;
-         2) admin_usb_golden_export || true ;;
-         3) admin_snapper_compare_menu || true ;;
-         4) admin_snapper_usb_compare_menu || true ;;
-         5) return 0 ;;
+         0) admin_show_snapper_config || true ;;
+         1) admin_show_snapper_snapshots || true ;;
+         2) admin_run_snapper_now || true ;;
+         3) admin_usb_golden_export || true ;;
+         4) admin_snapper_compare_menu || true ;;
+         5) admin_snapper_usb_compare_menu || true ;;
+         6) return 0 ;;
       esac
    done
 }
 
 admin_btrbk_menu() {
    local btrbk_options=(
+      "Configuracion actual"
       "Listado de los ultimos snapshots realizados"
       "Realizar snapshot ahora"
       "Gestion de particion recovery"
@@ -179,12 +192,13 @@ admin_btrbk_menu() {
       fi
 
       case "$UI_MENU_SELECTED" in
-         0) admin_show_btrbk_snapshots || true ;;
-         1) admin_run_btrbk_now || true ;;
-         2) admin_recovery_partition_menu || true ;;
-         3) admin_btrbk_compare_menu || true ;;
-         4) admin_btrbk_usb_compare_menu || true ;;
-         5) return 0 ;;
+         0) admin_show_btrbk_config || true ;;
+         1) admin_show_btrbk_snapshots || true ;;
+         2) admin_run_btrbk_now || true ;;
+         3) admin_recovery_partition_menu || true ;;
+         4) admin_btrbk_compare_menu || true ;;
+         5) admin_btrbk_usb_compare_menu || true ;;
+         6) return 0 ;;
       esac
    done
 }
