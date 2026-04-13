@@ -1,0 +1,152 @@
+Debian BTRFS checklist report
+Generated: 2026-04-13T14:22:07-03:00
+Host: Latitude5421
+User: nippur
+
+============================================================
+System
+============================================================
+
+> uname -a
+Linux Latitude5421 6.12.74+deb13+1-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.74-2 (2026-03-08) x86_64 GNU/Linux
+
+> lsblk -f
+NAME        FSTYPE FSVER LABEL    UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+nvme0n1                                                                               
+├─nvme0n1p1 vfat   FAT32          1307-2E6C                             480,3M     2% /boot/efi
+├─nvme0n1p2 btrfs        system   0129539c-e56d-4f72-ae33-206783eb2a00  172,2G     1% /home
+│                                                                                     /
+├─nvme0n1p3 btrfs        recovery d6859b9f-8371-421a-a795-8bec7ca03abc                
+└─nvme0n1p4 swap   1              d415f782-c942-440a-be3f-8fbc27350924                [SWAP]
+
+============================================================
+Mounts and subvolumes
+============================================================
+
+> findmnt /
+TARGET SOURCE             FSTYPE OPTIONS
+/      /dev/nvme0n1p2[/@] btrfs  rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/@
+
+> findmnt /home
+TARGET SOURCE                 FSTYPE OPTIONS
+/home  /dev/nvme0n1p2[/@home] btrfs  rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvolid=257,subvol=/@home
+
+> btrfs subvolume show /
+@
+	Name: 			@
+	UUID: 			d36406c3-bbff-0b4a-998e-507242345f1a
+	Parent UUID: 		-
+	Received UUID: 		-
+	Creation time: 		2026-04-13 00:21:20 -0300
+	Subvolume ID: 		256
+	Generation: 		490
+	Gen at creation: 	9
+	Parent ID: 		5
+	Top level ID: 		5
+	Flags: 			-
+	Send transid: 		0
+	Send time: 		2026-04-13 00:21:20 -0300
+	Receive transid: 	0
+	Receive time: 		-
+	Snapshot(s):
+				@/.snapshots/1/snapshot
+				@/.snapshots/2/snapshot
+				@/.snapshots/3/snapshot
+				@/.snapshots/4/snapshot
+				@/.snapshots/5/snapshot
+				@/.snapshots/6/snapshot
+				@/.snapshots/7/snapshot
+				@/.snapshots/8/snapshot
+				@/.snapshots/9/snapshot
+				@/.snapshots/10/snapshot
+				@/.snapshots/11/snapshot
+				@/.snapshots/12/snapshot
+	Quota group:		n/a
+
+> btrfs subvolume show /home
+@home
+	Name: 			@home
+	UUID: 			9ab3e6c9-285c-b148-acb1-81370a93c565
+	Parent UUID: 		-
+	Received UUID: 		-
+	Creation time: 		2026-04-13 00:36:45 -0300
+	Subvolume ID: 		257
+	Generation: 		491
+	Gen at creation: 	35
+	Parent ID: 		5
+	Top level ID: 		5
+	Flags: 			-
+	Send transid: 		0
+	Send time: 		2026-04-13 00:36:45 -0300
+	Receive transid: 	0
+	Receive time: 		-
+	Snapshot(s):
+	Quota group:		n/a
+
+============================================================
+fstab
+============================================================
+
+> grep btrfs/subvol in /etc/fstab
+# / was on /dev/nvme0n1p2 during installation
+# UUID=0129539c-e56d-4f72-ae33-206783eb2a00 /               btrfs   noatime,subvol=@rootfs 0       0
+UUID=0129539c-e56d-4f72-ae33-206783eb2a00 / btrfs noatime,subvol=@,compress=zstd:3 0 0
+UUID=0129539c-e56d-4f72-ae33-206783eb2a00 /home btrfs noatime,subvol=@home,compress=zstd:3 0 0
+UUID=0129539c-e56d-4f72-ae33-206783eb2a00 /mnt/btrfs-root btrfs noauto,subvolid=5,compress=zstd:3 0 0
+# /mnt/backup was on /dev/nvme0n1p3 during installation
+# UUID=d6859b9f-8371-421a-a795-8bec7ca03abc /mnt/backup     btrfs   defaults        0       0
+UUID=d6859b9f-8371-421a-a795-8bec7ca03abc /mnt/backup btrfs noatime,noauto,compress=zstd:3 0 0
+
+============================================================
+Services
+============================================================
+
+> systemctl is-enabled snapper-cleanup.timer
+enabled
+
+> systemctl is-active snapper-cleanup.timer
+active
+
+> systemctl is-enabled btrbk.timer
+enabled
+
+> systemctl is-active btrbk.timer
+active
+
+> systemctl is-enabled grub-btrfsd
+enabled
+
+> systemctl is-active grub-btrfsd
+active
+
+============================================================
+Snapshots and backups
+============================================================
+
+> snapper -c root list (last 10)
+ 3  | post   |          2 | lun 13 abr 2026 01:58:51 | root    | number   | apt                        |                        
+ 4  | pre    |            | lun 13 abr 2026 02:03:13 | root    | number   | apt                        |                        
+ 5  | post   |          4 | lun 13 abr 2026 02:03:14 | root    | number   | apt                        |                        
+ 6  | single |            | lun 13 abr 2026 02:12:55 | root    | number   | boot                       |                        
+ 7  | single |            | lun 13 abr 2026 02:56:14 | root    | number   | boot                       |                        
+ 8  | single |            | lun 13 abr 2026 03:03:37 | root    | number   | boot                       |                        
+ 9  | single |            | lun 13 abr 2026 03:06:05 | root    | number   | boot                       |                        
+10  | single |            | lun 13 abr 2026 03:15:32 | root    |          | GOLDEN antes de escritorio |                        
+11  | single |            | lun 13 abr 2026 03:15:40 | root    |          | GOLDEN antes de escritorio |                        
+12  | single |            | lun 13 abr 2026 12:47:17 | root    | number   | boot                       |                        
+
+> btrbk list snapshots
+WARNING: Skipping subvolume "/mnt/btrfs-root/@": Failed to fetch subvolume detail
+WARNING: ... Command execution failed (exitcode=1)
+WARNING: ... sh: readlink -v -e '/mnt/btrfs-root/@'
+WARNING: ... readlink: /mnt/btrfs-root/@: No existe el fichero o el directorio
+SOURCE_SUBVOLUME  SNAPSHOT_SUBVOLUME  STATUS
+
+[WARN] Command failed: btrbk list snapshots
+
+============================================================
+Quick checks
+============================================================
+
+[FAIL] /etc/fstab still contains @rootfs
+[OK] /mnt/backup is configured with noauto

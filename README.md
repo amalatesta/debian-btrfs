@@ -584,7 +584,7 @@ sudo cp /ruta/a/btrfs-rename-subvols.sh /boot/efi/
 
 # O descargar desde GitHub si tenés internet ahora:
 wget -O /boot/efi/btrfs-rename-subvols.sh \
-  https://raw.githubusercontent.com/amalatesta/debian-btrfs/main/scripts/btrfs-rename-subvols.sh
+   https://raw.githubusercontent.com/amalatesta/debian-btrfs/main/scripts/instalador/btrfs-rename-subvols.sh
 ```
 
 En Rescue Mode, después de instalar Debian:

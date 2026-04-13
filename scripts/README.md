@@ -151,7 +151,7 @@ bash 008_debian-btrfs-installer.sh
 ### Desde fuera del directorio
 ```bash
 cd debian-btrfs
-bash scripts/008_debian-btrfs-installer.sh
+bash scripts/instalador/008_debian-btrfs-installer.sh
 ```
 
 ## Arquitectura de Diseño
@@ -236,7 +236,7 @@ bash scripts/008_debian-btrfs-installer.sh
 ### Para Debugging
 - Agregar `printf "[debug] ...\\n"` en funciones clave
 - La salida de `run_with_progress()` muestra últimas líneas de logs
-- Sintaxis validable con `bash -n scripts/008_debian-btrfs-installer.sh`
+- Sintaxis validable con `bash -n scripts/instalador/008_debian-btrfs-installer.sh`
 
 ## Contacto / Contribución
 
