@@ -3212,6 +3212,15 @@ show_final_summary() {
     printf "[install]      sudo mkdir /.snapshots && sudo mount -a\n"
     printf "[install]   2) sudo apt install btrbk\n"
     printf "[install]      sudo nano /etc/btrbk/btrbk.conf\n"
+
+    printf "\n[install] ANTES DE REINICIAR:\n"
+    printf "[install]   - Retira/desmonta el medio de instalacion (ISO/USB) en la VM.\n"
+    printf "[install]   - Verifica que el disco instalado quede primero en el orden de booteo.\n"
+
+    printf "\n[install] NOTA SOBRE GRUB:\n"
+    printf "[install]   - La entrada 'UEFI Firmware Settings' puede no aparecer en algunas VMs.\n"
+    printf "[install]   - Su presencia depende del soporte fwsetup del firmware virtual.\n"
+
     printf "\n[install] log completo: %s\n" "$LOG_FILE"
     printf "\n"
 }
