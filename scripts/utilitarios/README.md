@@ -45,7 +45,18 @@ Para que sirve:
 Uso:
 - sudo scripts/utilitarios/backup-health-report.sh
 
-### 3) snapper-run-now.sh
+### 3) snapper-show-config.sh
+
+Para que sirve:
+- Muestra la configuracion actual de Snapper (que snapshots, donde se guardan, qué los dispara).
+- Indica disparadores: snapshots manuales, pre/post APT.
+- Muestra limites de retencion y estado de la limpieza automatica.
+- Incluye ultimos snapshots locales.
+
+Uso:
+- sudo scripts/utilitarios/snapper-show-config.sh
+
+### 4) snapper-run-now.sh
 
 Para que sirve:
 - Crea un snapshot manual de Snapper con descripcion automática (fecha/hora).
@@ -55,7 +66,18 @@ Para que sirve:
 Uso:
 - sudo scripts/utilitarios/snapper-run-now.sh
 
-### 4) btrbk-run-now.sh
+### 5) btrbk-show-config.sh
+
+Para que sirve:
+- Muestra la configuracion actual de Btrbk (volumenes, destino, qué los dispara).
+- Indica disparadores: snapshots manuales, post APT, timer diario.
+- Muestra politica de retencion, compresion y estado de /mnt/backup.
+- Incluye ultimos snapshots en recovery.
+
+Uso:
+- sudo scripts/utilitarios/btrbk-show-config.sh
+
+### 6) btrbk-run-now.sh
 
 Para que sirve:
 - Ejecuta un backup inmediato usando systemd (btrbk.service), respetando el flujo seguro de montaje/desmontaje.
@@ -64,7 +86,7 @@ Para que sirve:
 Uso:
 - sudo scripts/utilitarios/btrbk-run-now.sh
 
-### 5) recovery-partition.sh
+### 7) recovery-partition.sh
 
 Para que sirve:
 - Gestion rapida de /mnt/backup en tareas manuales de administracion.
@@ -82,7 +104,7 @@ Uso:
 - Remontar read-write:
   - sudo scripts/utilitarios/recovery-partition.sh rw
 
-### 6) usb-golden-snapshot.sh
+### 8) usb-golden-snapshot.sh
 
 Para que sirve:
 - Crea (o reutiliza) un snapshot de Snapper y lo exporta a un USB.
@@ -99,7 +121,7 @@ Uso:
 - Limpiar export local luego de copiar al USB:
   - sudo scripts/utilitarios/usb-golden-snapshot.sh --device /dev/sdX1 --cleanup-local-export
 
-### 7) snapshot-compare.sh
+### 9) snapshot-compare.sh
 
 Para que sirve:
 - Compara snapshots locales de Snapper.
