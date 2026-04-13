@@ -349,9 +349,9 @@ admin_usb_golden_export() {
    local _USB_FREE_HUMAN="" _ROOT_USED_HUMAN=""
    local supported_formats="btrfs exfat vfat ntfs ext4 ext3 ext2 xfs f2fs"
    local mode_options=(
-      "Auto detectar filesystem del USB"
-      "Forzar Btrfs (send/receive)"
-      "Forzar stream portable (.btrfs-stream)"
+      "Auto detectar (recomendado)"
+      "Btrfs send/receive (requiere USB Btrfs)"
+      "Stream portable (.btrfs-stream, cualquier filesystem)"
       "Cancelar"
    )
    local cleanup_options=(
