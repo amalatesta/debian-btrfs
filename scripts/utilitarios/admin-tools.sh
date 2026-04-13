@@ -14,7 +14,6 @@ MAIN_OPTIONS=(
    "Informar estado actual"
    "Snapper"
    "Btrbk"
-   "Comparar snapshots"
    "Ver README de utilitarios"
    "Ayuda"
    "Salir"
@@ -43,10 +42,9 @@ main() {
          0) admin_show_boot_context || true ;;
          1) admin_snapper_menu || true ;;
          2) admin_btrbk_menu || true ;;
-         3) admin_snapshot_compare_menu || true ;;
-         4) admin_show_utilitarios_readme || true ;;
-         5) admin_show_help || true ;;
-         6) break ;;
+         3) admin_show_utilitarios_readme || true ;;
+         4) admin_show_help || true ;;
+         5) break ;;
       esac
    done
 }

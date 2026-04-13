@@ -130,6 +130,8 @@ admin_snapper_menu() {
       "Listado de los ultimos snapshots realizados"
       "Realizar snapshot ahora"
       "Exportar snapshot GOLDEN a USB"
+      "Comparar snapshots locales"
+      "Comparar con USB"
       "Volver"
    )
 
@@ -148,7 +150,9 @@ admin_snapper_menu() {
          0) admin_show_snapper_snapshots || true ;;
          1) admin_run_snapper_now || true ;;
          2) admin_usb_golden_export || true ;;
-         3) return 0 ;;
+         3) admin_snapper_compare_menu || true ;;
+         4) admin_snapper_usb_compare_menu || true ;;
+         5) return 0 ;;
       esac
    done
 }
@@ -158,6 +162,8 @@ admin_btrbk_menu() {
       "Listado de los ultimos snapshots realizados"
       "Realizar snapshot ahora"
       "Gestion de particion recovery"
+      "Comparar snapshots de recovery"
+      "Comparar con USB"
       "Volver"
    )
 
@@ -176,7 +182,111 @@ admin_btrbk_menu() {
          0) admin_show_btrbk_snapshots || true ;;
          1) admin_run_btrbk_now || true ;;
          2) admin_recovery_partition_menu || true ;;
-         3) return 0 ;;
+         3) admin_btrbk_compare_menu || true ;;
+         4) admin_btrbk_usb_compare_menu || true ;;
+         5) return 0 ;;
+      esac
+   done
+}
+
+admin_snapper_compare_menu() {
+   local compare_options=(
+      "Snapshot local vs estado actual"
+      "Comparar dos snapshots locales"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Snapper | Comparar" \
+         "Elegir tipo de comparacion" \
+         compare_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_compare_snapper_current ;;
+         1) admin_compare_snapper_two ;;
+         2) return 0 ;;
+      esac
+   done
+}
+
+admin_snapper_usb_compare_menu() {
+   local usb_compare_options=(
+      "USB Btrfs vs estado actual"
+      "USB Stream (.btrfs-stream) vs estado actual"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Snapper | Comparar con USB" \
+         "Elegir tipo de archivo USB" \
+         usb_compare_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_compare_usb_btrfs_current ;;
+         1) admin_compare_usb_stream_current ;;
+         2) return 0 ;;
+      esac
+   done
+}
+
+admin_btrbk_compare_menu() {
+   local compare_options=(
+      "Snapshot de recovery vs estado actual"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Btrbk | Comparar" \
+         "Elegir tipo de comparacion" \
+         compare_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_compare_btrbk_current ;;
+         1) return 0 ;;
+      esac
+   done
+}
+
+admin_btrbk_usb_compare_menu() {
+   local usb_compare_options=(
+      "USB Btrfs vs estado actual"
+      "USB Stream (.btrfs-stream) vs estado actual"
+      "Volver"
+   )
+
+   while true; do
+      ui_run_menu \
+         "Btrbk | Comparar con USB" \
+         "Elegir tipo de archivo USB" \
+         usb_compare_options \
+         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
+
+      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
+         return 0
+      fi
+
+      case "$UI_MENU_SELECTED" in
+         0) admin_compare_usb_btrfs_current ;;
+         1) admin_compare_usb_stream_current ;;
+         2) return 0 ;;
       esac
    done
 }
@@ -466,52 +576,30 @@ admin_compare_usb_stream_current() {
       "$SNAPSHOT_COMPARE_SCRIPT" --mode usb-stream --device "$device" --stream-name "$stream_name"
 }
 
-admin_snapshot_compare_menu() {
-   local compare_options=(
-      "Snapper: snapshot local vs estado actual"
-      "Snapper: comparar dos snapshots locales"
-      "btrbk: snapshot de backup vs estado actual"
-      "USB Btrfs: snapshot USB vs estado actual"
-      "USB Stream: archivo .btrfs-stream vs estado actual"
-      "Volver"
-   )
-
-   while true; do
-      ui_run_menu \
-         "Admin Tools | Comparar snapshots" \
-         "Elegir origen y tipo de comparacion" \
-         compare_options \
-         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
-
-      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
-         return 0
-      fi
-
-      case "$UI_MENU_SELECTED" in
-         0) admin_compare_snapper_current ;;
-         1) admin_compare_snapper_two ;;
-         2) admin_compare_btrbk_current ;;
-         3) admin_compare_usb_btrfs_current ;;
-         4) admin_compare_usb_stream_current ;;
-         5) return 0 ;;
-      esac
-   done
-}
-
 admin_show_help() {
    local help_lines=(
       "Admin Tools centraliza los utilitarios de mantenimiento del proyecto."
       ""
-      "Acciones disponibles:"
-      "- Ver contexto de arranque y sistema"
-      "- Listar ultimos snapshots de Snapper"
-      "- Listar ultimos snapshots de btrbk"
-      "- Realizar un snapshot manual con Snapper"
-      "- Realizar un backup/snapshot con btrbk"
-      "- Gestionar /mnt/backup manualmente"
-      "- Exportar snapshot GOLDEN a USB"
-      "- Comparar snapshots desde snapper, btrbk y USB"
-      "- Ver README tecnico dentro de la UI"
+      "Menu principal:"
+      "- Informar estado actual: muestra contexto de arranque y sistema"
+      "- Snapper: submenú de operaciones de snapshots locales"
+      "- Btrbk: submenú de operaciones de snapshots en recovery"
+      "- Ver README de utilitarios dentro de la UI"
+      "- Ayuda"
+      ""
+      "Submenú Snapper:"
+      "  - Listado de ultimos snapshots"
+      "  - Realizar snapshot ahora"
+      "  - Exportar snapshot GOLDEN a USB"
+      "  - Comparar snapshots locales (vs actual o entre dos)"
+      "  - Comparar con USB (Btrfs o Stream)"
+      ""
+      "Submenú Btrbk:"
+      "  - Listado de ultimos snapshots de recovery"
+      "  - Realizar snapshot/backup ahora"
+      "  - Gestion de /mnt/backup (mount, umount, ro/rw)"
+      "  - Comparar snapshots de recovery vs actual"
+      "  - Comparar con USB (Btrfs o Stream)"
       ""
       "Diseno modular:"
       "- admin-tools.sh: launcher y menu principal"
