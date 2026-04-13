@@ -176,7 +176,6 @@ admin_btrbk_menu() {
       "Realizar snapshot ahora"
       "Gestion de particion recovery"
       "Comparar snapshots de recovery"
-      "Comparar con USB"
       "Volver"
    )
 
@@ -197,8 +196,7 @@ admin_btrbk_menu() {
          2) admin_run_btrbk_now || true ;;
          3) admin_recovery_partition_menu || true ;;
          4) admin_btrbk_compare_menu || true ;;
-         5) admin_btrbk_usb_compare_menu || true ;;
-         6) return 0 ;;
+         5) return 0 ;;
       esac
    done
 }
@@ -275,32 +273,6 @@ admin_btrbk_compare_menu() {
       case "$UI_MENU_SELECTED" in
          0) admin_compare_btrbk_current ;;
          1) return 0 ;;
-      esac
-   done
-}
-
-admin_btrbk_usb_compare_menu() {
-   local usb_compare_options=(
-      "USB Btrfs vs estado actual"
-      "USB Stream (.btrfs-stream) vs estado actual"
-      "Volver"
-   )
-
-   while true; do
-      ui_run_menu \
-         "Btrbk | Comparar con USB" \
-         "Elegir tipo de archivo USB" \
-         usb_compare_options \
-         "Flechas: mover | ENTER: ejecutar | q/Esc: volver"
-
-      if [[ "$UI_MENU_EVENT" == "QUIT" ]]; then
-         return 0
-      fi
-
-      case "$UI_MENU_SELECTED" in
-         0) admin_compare_usb_btrfs_current ;;
-         1) admin_compare_usb_stream_current ;;
-         2) return 0 ;;
       esac
    done
 }
@@ -609,11 +581,11 @@ admin_show_help() {
       "  - Comparar con USB (Btrfs o Stream)"
       ""
       "Submenú Btrbk:"
+      "  - Configuracion actual (disparadores, volumes, retencion)"
       "  - Listado de ultimos snapshots de recovery"
       "  - Realizar snapshot/backup ahora"
       "  - Gestion de /mnt/backup (mount, umount, ro/rw)"
       "  - Comparar snapshots de recovery vs actual"
-      "  - Comparar con USB (Btrfs o Stream)"
       ""
       "Diseno modular:"
       "- admin-tools.sh: launcher y menu principal"
