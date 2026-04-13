@@ -146,15 +146,6 @@ fi
 EXPORT_BASE="/golden-exports"
 EXPORT_PATH="${EXPORT_BASE}/${NAME}"
 
-mkdir -p "$EXPORT_BASE"
-if [[ -e "$EXPORT_PATH" ]]; then
-   echo "Export path already exists: $EXPORT_PATH"
-   exit 1
-fi
-
-echo "Creating readonly export: $EXPORT_PATH"
-btrfs subvolume snapshot -r "$SOURCE_SNAPSHOT" "$EXPORT_PATH"
-
 mounted_here=0
 if mountpoint -q "$MOUNTPOINT"; then
    echo "Mountpoint already mounted: $MOUNTPOINT"
@@ -167,6 +158,32 @@ fi
 
 stream_file=""
 sha_file=""
+target_path=""
+
+if [[ "$MODE" == "btrfs" ]]; then
+   target_path="$MOUNTPOINT/snapshots/$NAME"
+else
+   target_path="$MOUNTPOINT/btrfs-streams/${NAME}.btrfs-stream"
+fi
+
+if [[ -e "$target_path" ]]; then
+   echo "Target already exists on USB: $target_path"
+   echo "Abort: evita sobrescribir copias previas."
+   echo "Usa un --name nuevo o borra la copia existente en USB."
+   if [[ "$mounted_here" -eq 1 ]]; then
+      umount "$MOUNTPOINT" >/dev/null 2>&1 || true
+   fi
+   exit 1
+fi
+
+mkdir -p "$EXPORT_BASE"
+if [[ -e "$EXPORT_PATH" ]]; then
+   echo "Export path already exists: $EXPORT_PATH"
+   exit 1
+fi
+
+echo "Creating readonly export: $EXPORT_PATH"
+btrfs subvolume snapshot -r "$SOURCE_SNAPSHOT" "$EXPORT_PATH"
 
 if [[ "$MODE" == "btrfs" ]]; then
    echo "Transfer mode: btrfs send/receive"
@@ -183,6 +200,13 @@ else
    mkdir -p "$MOUNTPOINT/btrfs-streams"
    stream_file="$MOUNTPOINT/btrfs-streams/${NAME}.btrfs-stream"
    sha_file="$MOUNTPOINT/btrfs-streams/${NAME}.sha256"
+
+    if [[ -e "$stream_file" || -e "$sha_file" ]]; then
+      echo "Target already exists on USB: $stream_file or $sha_file"
+      echo "Abort: evita sobrescribir copias previas."
+      echo "Usa un --name nuevo o borra la copia existente en USB."
+      exit 1
+   fi
 
    btrfs send "$EXPORT_PATH" > "$stream_file"
    sync
