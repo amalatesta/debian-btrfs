@@ -2317,58 +2317,8 @@ EOF
     ok "preview generado sin operaciones destructivas"
 }
 
-main() {
-    print_header
-    analyze_memory
-    printf "\n"
-    analyze_cpu
-    printf "\n"
-    check_environment
-    printf "\n"
-    detect_runtime_context
-    printf "\n"
-    verify_disk_space
-    printf "\n"
-    detect_storage
-    printf "\n"
-    analyze_network
-    printf "\n"
-    analyze_and_suggest
-    printf "\n"
-    print_preview_plan
-
-    printf "\n[dry-run] ==========================================\n"
-    printf "[dry-run] RESULTADO: Analisis completado exitosamente\n"
-    printf "[dry-run] ==========================================\n"
-}
-
-# ============================================
 # BLOQUE: INSTALL FUNCTIONS (renombrado install_*)
 # ============================================
-
-# ============================================
-# ESTADO RUNTIME
-# ============================================
-
-INSTALL_DISK=""
-INSTALL_DISK_SIZE_GB=0
-INSTALL_RAM_GB=0
-INSTALL_EFI_PART=""
-INSTALL_SYSTEM_PART=""
-INSTALL_BACKUP_PART=""
-EFI_UUID=""
-SYSTEM_UUID=""
-BACKUP_UUID=""
-MOUNTED_TARGET="false"
-MOUNTED_CHROOT_BIND="false"
-GRUB_BTRFS_INSTALLED="N"
-
-INSTALL_SUGGESTED_EFI="1G"
-INSTALL_SUGGESTED_SYSTEM_GB=0
-INSTALL_SUGGESTED_SYSTEM_PCT=0
-INSTALL_SUGGESTED_BACKUP_GB=0
-INSTALL_SUGGESTED_SWAP=""
-SWAP_REASON=""
 INSTALL_SUGGESTED_HOSTNAME="debian-pc"
 INSTALL_SUGGESTED_USERNAME="usuario"
 
