@@ -82,7 +82,7 @@ fi
 append_section "Quick checks"
 {
   echo
-  if grep -q "@rootfs" /etc/fstab; then
+  if grep -Eq "^[[:space:]]*[^#].*@rootfs" /etc/fstab; then
     echo "[FAIL] /etc/fstab still contains @rootfs"
   else
     echo "[OK] /etc/fstab does not contain @rootfs"
