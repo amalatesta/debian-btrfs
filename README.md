@@ -776,20 +776,34 @@ DEBES reinstalar GRUB para que use la nueva configuración.
 
 ---
 
-#### Paso 1: Desmontar y remontar correctamente
+#### Paso 1: Desmontar todo (verificar y limpiar estado previo)
 
 ```bash
 # Salir del directorio de trabajo
 cd /
 
-# Desmontar todo (si ya estaba montado)
-umount /mnt/btrfs/@/boot/efi 2>/dev/null
-umount /mnt/btrfs/@/dev 2>/dev/null
-umount /mnt/btrfs/@/proc 2>/dev/null
-umount /mnt/btrfs/@/sys 2>/dev/null
-umount /mnt/btrfs/@ 2>/dev/null
-umount /mnt/btrfs 2>/dev/null
+# Verificar qué está montado en /mnt
+echo "Estado actual de montajes en /mnt:"
+mount | grep /mnt || echo "(nada montado)"
+
+# Desmontar todo en orden inverso (ignorar errores si no estaban montados)
+# Los '2>/dev/null' silencian errores si algo ya está desmontado
+umount /mnt/btrfs/@/boot/efi 2>/dev/null || true
+umount /mnt/btrfs/@/dev 2>/dev/null || true
+umount /mnt/btrfs/@/proc 2>/dev/null || true
+umount /mnt/btrfs/@/sys 2>/dev/null || true
+umount /mnt/btrfs/@ 2>/dev/null || true
+umount /mnt/btrfs 2>/dev/null || true
+
+# Verificar que quedó todo limpio
+echo "Después de desmontar:"
+mount | grep /mnt && echo "⚠️ Aún hay montajes en /mnt" || echo "✅ Todo desmontado"
 ```
+
+**Explicación:**
+- `2>/dev/null` redirige errores a "nada" (los silencia)
+- `|| true` asegura que el script continúe aunque el comando falle
+- La verificación con `mount | grep /mnt` muestra qué estaba montado antes
 
 #### Paso 2: Montar el sistema para chroot
 
