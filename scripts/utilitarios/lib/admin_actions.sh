@@ -368,8 +368,8 @@ admin_usb_golden_export() {
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB a usar (ejemplo: /dev/sdb1)" "/dev/sdX1")"
-   if [[ -z "$device" || "$device" == "/dev/sdX1" ]]; then
+   device="$(ui_prompt_input "Particion USB a usar (ejemplo: /dev/sdb1)" "")"
+   if [[ -z "$device" ]]; then
       ui_show_message "USB Golden" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
@@ -596,8 +596,8 @@ admin_compare_usb_btrfs_current() {
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB Btrfs (ejemplo: /dev/sdb1)" "/dev/sdX1")"
-   if [[ -z "$device" || "$device" == "/dev/sdX1" ]]; then
+   device="$(ui_prompt_input "Particion USB Btrfs (ejemplo: /dev/sdb1)" "")"
+   if [[ -z "$device" ]]; then
       ui_show_message "Comparar USB Btrfs" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
@@ -653,8 +653,8 @@ admin_compare_usb_stream_current() {
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
-   device="$(ui_prompt_input "Particion USB con streams (ejemplo: /dev/sdb1)" "/dev/sdX1")"
-   if [[ -z "$device" || "$device" == "/dev/sdX1" ]]; then
+   device="$(ui_prompt_input "Particion USB con streams (ejemplo: /dev/sdb1)" "")"
+   if [[ -z "$device" ]]; then
       ui_show_message "Comparar USB Stream" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
