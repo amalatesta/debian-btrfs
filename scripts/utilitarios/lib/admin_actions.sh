@@ -67,6 +67,40 @@ admin_show_boot_context() {
    admin_run_report "Estado actual del sistema" "$BOOT_CONTEXT_SCRIPT"
 }
 
+# Helper: obtiene el filesystem type de un dispositivo de bloque
+# Uso: fstype=$(admin_get_usb_fstype /dev/sdb1)
+admin_get_usb_fstype() {
+   blkid -s TYPE -o value "$1" 2>/dev/null
+}
+
+# Helper: verifica que haya espacio libre en el USB para el golden export.
+# Monta temporalmente para verificar. Exporta _USB_FREE_HUMAN y _ROOT_USED_HUMAN.
+# Retorna: 0=ok, 1=espacio insuficiente, 2=no se pudo montar
+admin_check_usb_space() {
+   local device="$1"
+   local root_used_kb usb_free_kb mounted_here=0
+
+   root_used_kb=$(df -BK / | awk 'NR==2{val=$3; gsub(/K/,"",val); print val+0}')
+
+   mkdir -p /mnt/usb
+   if ! mountpoint -q /mnt/usb; then
+      if ! mount "$device" /mnt/usb 2>/dev/null; then
+         return 2
+      fi
+      mounted_here=1
+   fi
+
+   usb_free_kb=$(df -BK /mnt/usb | awk 'NR==2{val=$4; gsub(/K/,"",val); print val+0}')
+   _USB_FREE_HUMAN=$(df -h /mnt/usb | awk 'NR==2{print $4}')
+   _ROOT_USED_HUMAN=$(df -h / | awk 'NR==2{print $3}')
+
+   if [[ "$mounted_here" -eq 1 ]]; then
+      umount /mnt/usb 2>/dev/null || true
+   fi
+
+   (( usb_free_kb >= root_used_kb )) && return 0 || return 1
+}
+
 admin_show_snapper_snapshots() {
    local snapper_lines=()
    mapfile -t snapper_lines < <(snapper -c root list)
@@ -311,7 +345,9 @@ admin_recovery_partition_menu() {
 
 admin_usb_golden_export() {
    local lsblk_lines=()
-   local device mode cleanup_choice description name cmd=()
+   local device fstype mode cleanup_choice description name cmd=()
+   local _USB_FREE_HUMAN="" _ROOT_USED_HUMAN=""
+   local supported_formats="btrfs exfat vfat ntfs ext4 ext3 ext2 xfs f2fs"
    local mode_options=(
       "Auto detectar filesystem del USB"
       "Forzar Btrfs (send/receive)"
@@ -323,7 +359,12 @@ admin_usb_golden_export() {
       "Borrar export local al finalizar"
       "Cancelar"
    )
+   local confirm_options=(
+      "Confirmar y continuar"
+      "Cancelar"
+   )
 
+   # 1. Mostrar dispositivos y pedir seleccion
    mapfile -t lsblk_lines < <(lsblk -o NAME,MODEL,TRAN,SIZE,FSTYPE,MOUNTPOINTS,RM -e 7)
    ui_show_text_box "USB Detectados" lsblk_lines "Revisar dispositivo y luego ENTER"
 
@@ -332,11 +373,44 @@ admin_usb_golden_export() {
       ui_show_message "USB Golden" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
+
+   # 2. Validar que el dispositivo de bloque exista
    if [[ ! -b "$device" ]]; then
-      ui_show_message "USB Golden" "Dispositivo no encontrado: $device\nConecta el USB e intenta de nuevo."
+      ui_show_message "USB Golden" "Dispositivo no encontrado: $device
+Conecta el USB e intenta de nuevo."
       return 1
    fi
 
+   # 3. Validar formato del filesystem
+   fstype="$(admin_get_usb_fstype "$device")"
+   if [[ -z "$fstype" ]]; then
+      ui_show_message "USB Golden" "No se pudo determinar el filesystem de $device.
+Verifica que el USB este correctamente formateado."
+      return 1
+   fi
+   if [[ " $supported_formats " != *" $fstype "* ]]; then
+      ui_show_message "USB Golden" "Filesystem no soportado: $fstype
+Formatos validos: btrfs, exfat, vfat, ntfs, ext4, xfs."
+      return 1
+   fi
+
+   # 4. Verificar espacio disponible
+   local space_rc
+   admin_check_usb_space "$device"; space_rc=$?
+   if [[ "$space_rc" -eq 2 ]]; then
+      ui_show_message "USB Golden" "No se pudo montar $device para verificar espacio.
+Verifica que el filesystem sea compatible."
+      return 1
+   fi
+   if [[ "$space_rc" -eq 1 ]]; then
+      ui_show_message "USB Golden" "Espacio insuficiente en el USB.
+  Libre en USB : $_USB_FREE_HUMAN
+  Usado en /   : $_ROOT_USED_HUMAN
+Libera espacio en el USB e intenta de nuevo."
+      return 1
+   fi
+
+   # 5. Elegir modo, descripcion, nombre, cleanup
    ui_run_menu \
       "USB Golden | Modo" \
       "Elegir modo de exportacion" \
@@ -373,6 +447,35 @@ admin_usb_golden_export() {
       *) return 1 ;;
    esac
 
+   # 6. Mostrar resumen y pedir confirmacion final
+   local summary_lines=(
+      "Resumen de la operacion:"
+      ""
+      "  Dispositivo  : $device"
+      "  Filesystem   : $fstype"
+      "  Libre en USB : $_USB_FREE_HUMAN"
+      "  Usado en /   : $_ROOT_USED_HUMAN"
+      "  Modo         : $mode"
+      "  Descripcion  : $description"
+      "  Nombre       : $name"
+      "  Export local : $cleanup_choice"
+      ""
+      "Esta operacion creara un snapshot Snapper y lo exportara al USB."
+   )
+   ui_show_text_box "USB Golden | Confirmacion" summary_lines "ENTER para continuar"
+
+   ui_run_menu \
+      "USB Golden | Confirmacion" \
+      "¿Proceder con la exportacion GOLDEN?" \
+      confirm_options \
+      "Flechas: mover | ENTER: confirmar | q/Esc: cancelar"
+
+   if [[ "$UI_MENU_EVENT" == "QUIT" || "$UI_MENU_SELECTED" -eq 1 ]]; then
+      ui_show_message "USB Golden" "Operacion cancelada por el usuario."
+      return 1
+   fi
+
+   # 7. Ejecutar
    cmd=("$USB_GOLDEN_SCRIPT" "--device" "$device" "--mode" "$mode" "--description" "$description" "--name" "$name")
    if [[ "$cleanup_choice" == "delete" ]]; then
       cmd+=("--cleanup-local-export")
@@ -499,7 +602,17 @@ admin_compare_usb_btrfs_current() {
       return 1
    fi
    if [[ ! -b "$device" ]]; then
-      ui_show_message "Comparar USB Btrfs" "Dispositivo no encontrado: $device\nConecta el USB e intenta de nuevo."
+      ui_show_message "Comparar USB Btrfs" "Dispositivo no encontrado: $device
+Conecta el USB e intenta de nuevo."
+      return 1
+   fi
+
+   # Validar que el filesystem sea Btrfs (necesario para comparar subvolumenes)
+   local fstype
+   fstype="$(admin_get_usb_fstype "$device")"
+   if [[ "$fstype" != "btrfs" ]]; then
+      ui_show_message "Comparar USB Btrfs" "El dispositivo $device no es Btrfs (detectado: ${fstype:-desconocido}).
+Esta comparacion requiere un USB formateado como Btrfs."
       return 1
    fi
 
