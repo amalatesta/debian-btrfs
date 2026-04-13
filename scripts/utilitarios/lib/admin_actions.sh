@@ -505,7 +505,10 @@ admin_compare_usb_btrfs_current() {
 
    mkdir -p /mnt/usb
    if ! mountpoint -q /mnt/usb; then
-      mount "$device" /mnt/usb
+      if ! mount "$device" /mnt/usb 2>/dev/null; then
+         ui_show_message "Comparar USB Btrfs" "No se pudo montar $device.\nVerifica que el filesystem sea compatible (Btrfs, ext4, exfat, ntfs)."
+         return 1
+      fi
       mounted_here=1
    fi
    mapfile -t usb_lines < <(find /mnt/usb/snapshots -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort)
@@ -549,7 +552,10 @@ admin_compare_usb_stream_current() {
 
    mkdir -p /mnt/usb
    if ! mountpoint -q /mnt/usb; then
-      mount "$device" /mnt/usb
+      if ! mount "$device" /mnt/usb 2>/dev/null; then
+         ui_show_message "Comparar USB Stream" "No se pudo montar $device.\nVerifica que el filesystem sea compatible (Btrfs, ext4, exfat, ntfs)."
+         return 1
+      fi
       mounted_here=1
    fi
    mapfile -t usb_lines < <(find /mnt/usb/btrfs-streams -mindepth 1 -maxdepth 1 -name '*.btrfs-stream' -printf '%f\n' 2>/dev/null | sort)
