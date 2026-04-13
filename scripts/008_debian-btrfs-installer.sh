@@ -816,35 +816,10 @@ ask_efi_in_plain_terminal() {
     hostname_value="${hostname_value:-$default_hostname}"
     DRYRUN_SELECTED_HOSTNAME="$hostname_value"
 
-    clear > /dev/tty
-    printf "\n[dry-run] usuario principal (simulacion):\n\n" > /dev/tty
-    read -r -p "Nombre de usuario [usuario] : " username_value < /dev/tty
-    username_value="${username_value:-usuario}"
-    DRYRUN_SELECTED_USERNAME="$username_value"
-
-    while true; do
-        clear > /dev/tty
-        printf "\n[dry-run] password de usuario:\n\n" > /dev/tty
-        read -r -s -p "Password para ${username_value}: " user_password < /dev/tty
-        printf "\n" > /dev/tty
-        if [[ -z "$user_password" ]]; then
-            printf "[dry-run] La password no puede estar vacia.\n" > /dev/tty
-            sleep 0.8
-            continue
-        fi
-
-        read -r -s -p "Confirmar password: " user_password_confirm < /dev/tty
-        printf "\n" > /dev/tty
-        if [[ "$user_password" != "$user_password_confirm" ]]; then
-            printf "[dry-run] Las passwords no coinciden. Reintenta.\n" > /dev/tty
-            sleep 0.8
-            continue
-        fi
-
-        user_password_set="S"
-        break
-    done
-    DRYRUN_SELECTED_USER_PASSWORD_SET="$user_password_set"
+    # En instalacion, usuario y password se piden en ask_disk_password_in_plain_terminal
+    # Aqui solo dejamos defaults vacios para dry-run
+    DRYRUN_SELECTED_USERNAME="usuario"
+    DRYRUN_SELECTED_USER_PASSWORD_SET="N"
 
     clear > /dev/tty
     printf "\n[dry-run] G : Gigas - M : Megas\n\n" > /dev/tty
@@ -1104,7 +1079,8 @@ ask_disk_password_in_plain_terminal() {
         printf "[install] Seleccion invalida.\n" > /dev/tty
     done
 
-    printf "\n[install] === USUARIO Y PASSWORD ===\n" > /dev/tty
+    # ==== USUARIO Y PASSWORD (identidad) ====
+    printf "\n[install] === IDENTIDAD: USUARIO Y PASSWORD ===\n\n" > /dev/tty
 
     local username_value input_username
     username_value="${DRYRUN_SELECTED_USERNAME:-usuario}"
@@ -1126,17 +1102,17 @@ ask_disk_password_in_plain_terminal() {
         break
     done
 
-    printf "[install] Usuario elegido: %s\n\n" "$DRYRUN_SELECTED_USERNAME" > /dev/tty
+    printf "\n" > /dev/tty
 
     local pw1 pw2
     while true; do
-        read -r -s -p "[install] Password        : " pw1 < /dev/tty
+        read -r -s -p "[install] Password para ${DRYRUN_SELECTED_USERNAME}        : " pw1 < /dev/tty
         printf "\n" > /dev/tty
         if [[ -z "$pw1" ]]; then
             printf "[install][warn] La password no puede estar vacia.\n" > /dev/tty
             continue
         fi
-        read -r -s -p "[install] Repite password : " pw2 < /dev/tty
+        read -r -s -p "[install] Repite password                : " pw2 < /dev/tty
         printf "\n" > /dev/tty
         if [[ "$pw1" == "$pw2" ]]; then
             DRYRUN_SELECTED_USER_PASSWORD="$pw1"
@@ -1145,7 +1121,7 @@ ask_disk_password_in_plain_terminal() {
         printf "[install][warn] Las passwords no coinciden. Intenta de nuevo.\n" > /dev/tty
     done
 
-    printf "\n[install] Disco: %s  |  Password: definida\n" "$DRYRUN_SELECTED_DISK" > /dev/tty
+    printf "\n[install] Disco: %s  |  Usuario: %s  |  Password: definida\n" "$DRYRUN_SELECTED_DISK" "$DRYRUN_SELECTED_USERNAME" > /dev/tty
     sleep 0.5
     setup_terminal
     flush_input_buffer
