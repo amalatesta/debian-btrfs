@@ -332,6 +332,10 @@ admin_usb_golden_export() {
       ui_show_message "USB Golden" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
+   if [[ ! -b "$device" ]]; then
+      ui_show_message "USB Golden" "Dispositivo no encontrado: $device\nConecta el USB e intenta de nuevo."
+      return 1
+   fi
 
    ui_run_menu \
       "USB Golden | Modo" \
@@ -494,6 +498,10 @@ admin_compare_usb_btrfs_current() {
       ui_show_message "Comparar USB Btrfs" "Operacion cancelada: falta dispositivo real."
       return 1
    fi
+   if [[ ! -b "$device" ]]; then
+      ui_show_message "Comparar USB Btrfs" "Dispositivo no encontrado: $device\nConecta el USB e intenta de nuevo."
+      return 1
+   fi
 
    mkdir -p /mnt/usb
    if ! mountpoint -q /mnt/usb; then
@@ -532,6 +540,10 @@ admin_compare_usb_stream_current() {
    device="$(ui_prompt_input "Particion USB con streams (ejemplo: /dev/sdb1)" "/dev/sdX1")"
    if [[ -z "$device" || "$device" == "/dev/sdX1" ]]; then
       ui_show_message "Comparar USB Stream" "Operacion cancelada: falta dispositivo real."
+      return 1
+   fi
+   if [[ ! -b "$device" ]]; then
+      ui_show_message "Comparar USB Stream" "Dispositivo no encontrado: $device\nConecta el USB e intenta de nuevo."
       return 1
    fi
 
